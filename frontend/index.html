@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Project Sunrise - Corporate Travel Booking</title>
+  </head>
+  <body style="margin:0;background-color:#f8fafc;transition:background-color 0.2s">
+    <div id="root"></div>
+    <script>
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches || localStorage.getItem('theme-dark') === 'true') {
+        document.documentElement.classList.add('dark');
+        document.body.style.backgroundColor = '#020617';
+        document.body.style.color = '#e2e8f0';
+        document.documentElement.style.backgroundColor = '#020617';
+      }
+    </script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
