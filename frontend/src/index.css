@@ -1,0 +1,272 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  CSS Custom Properties — Light Mode (default)
+  These replace the hardcoded Tailwind color values.
+  When .dark is added to <html>, the variables switch.
+*/
+:root {
+  /* Primary (blue) */
+  --color-primary-50: 240 249 255;
+  --color-primary-100: 224 242 254;
+  --color-primary-200: 186 230 253;
+  --color-primary-300: 125 211 252;
+  --color-primary-400: 56 189 248;
+  --color-primary-500: 14 165 233;
+  --color-primary-600: 2 132 199;
+  --color-primary-700: 3 105 161;
+  --color-primary-800: 7 89 133;
+  --color-primary-900: 12 74 110;
+
+  /* Secondary (slate) */
+  --color-secondary-50: 248 250 252;
+  --color-secondary-100: 241 245 249;
+  --color-secondary-200: 226 232 240;
+  --color-secondary-300: 203 213 225;
+  --color-secondary-400: 148 163 184;
+  --color-secondary-500: 100 116 139;
+  --color-secondary-600: 71 85 105;
+  --color-secondary-700: 51 65 85;
+  --color-secondary-800: 30 41 59;
+  --color-secondary-900: 15 23 42;
+  --color-secondary-950: 2 6 23;
+
+  /* Semantic overrides for light mode */
+  --bg-page: 248 250 252;
+  --bg-card: 255 255 255;
+  --bg-input: 255 255 255;
+  --bg-navbar: 255 255 255;
+  --bg-hover: 248 250 252;
+  --border-color: 226 232 240;
+  --border-color-strong: 203 213 225;
+  --text-page: 30 41 59;
+  --text-primary: 30 41 59;
+  --text-secondary: 100 116 139;
+  --text-muted: 148 163 184;
+  --shadow-color: 0 0 0;
+}
+
+/*
+  CSS Custom Properties — Dark Mode
+  Activated when <html class="dark">
+*/
+html.dark {
+  /* Primary (slightly brighter for dark bg contrast) */
+  --color-primary-50: 8 47 73;
+  --color-primary-100: 12 66 106;
+  --color-primary-200: 7 89 133;
+  --color-primary-300: 3 105 161;
+  --color-primary-400: 2 132 199;
+  --color-primary-500: 14 165 233;
+  --color-primary-600: 56 189 248;
+  --color-primary-700: 125 211 252;
+  --color-primary-800: 186 230 253;
+  --color-primary-900: 224 242 254;
+
+  /* Secondary (inverted — light text on dark bg) */
+  --color-secondary-50: 2 6 23;
+  --color-secondary-100: 15 23 42;
+  --color-secondary-200: 30 41 59;
+  --color-secondary-300: 51 65 85;
+  --color-secondary-400: 71 85 105;
+  --color-secondary-500: 100 116 139;
+  --color-secondary-600: 148 163 184;
+  --color-secondary-700: 203 213 225;
+  --color-secondary-800: 226 232 240;
+  --color-secondary-900: 241 245 249;
+  --color-secondary-950: 248 250 252;
+
+  /* Semantic overrides for dark mode */
+  --bg-page: 2 6 23;
+  --bg-card: 30 41 59;
+  --bg-input: 30 41 59;
+  --bg-navbar: 30 41 59;
+  --bg-hover: 51 65 85;
+  --border-color: 51 65 85;
+  --border-color-strong: 71 85 105;
+  --text-page: 226 232 240;
+  --text-primary: 241 245 249;
+  --text-secondary: 203 213 225;
+  --text-muted: 100 116 139;
+  --shadow-color: 0 0 0;
+}
+
+/*
+  Apply semantic variables to real elements
+*/
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+  background-color: rgb(var(--bg-page));
+  color: rgb(var(--text-page));
+  transition: background-color 0.2s, color 0.2s;
+}
+
+html {
+  min-height: 100%;
+  background-color: rgb(var(--bg-page));
+}
+
+#root {
+  min-height: 100vh;
+  background-color: rgb(var(--bg-page));
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 rounded-lg font-medium text-white transition-colors duration-200;
+    background-color: rgb(var(--color-primary-600));
+  }
+  .btn-primary:hover {
+    background-color: rgb(var(--color-primary-700));
+  }
+  
+  .btn-secondary {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+    background-color: rgb(var(--color-secondary-200));
+    color: rgb(var(--color-secondary-800));
+  }
+  .btn-secondary:hover {
+    background-color: rgb(var(--color-secondary-300));
+  }
+  
+  .btn-danger {
+    @apply px-4 py-2 rounded-lg font-medium text-white transition-colors duration-200;
+    background-color: rgb(220 38 38);
+  }
+  .btn-danger:hover {
+    background-color: rgb(185 28 28);
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    background-color: rgb(var(--bg-input));
+    border: 1px solid rgb(var(--border-color-strong));
+    color: rgb(var(--text-primary));
+  }
+  .input-field::placeholder {
+    color: rgb(var(--text-muted));
+  }
+  
+  .card {
+    @apply rounded-xl shadow-md p-6;
+    background-color: rgb(var(--bg-card));
+    border: 1px solid rgb(var(--border-color));
+  }
+  
+  .label {
+    @apply block text-sm font-medium mb-2;
+    color: rgb(var(--text-secondary));
+  }
+}
+
+/* Scrollbar */
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Global dark mode overrides for Tailwind color utilities that use hardcoded values */
+
+/* Secondary (already using CSS vars but adding explicit overrides as fallback) */
+html.dark .bg-secondary-100 { background-color: rgb(var(--color-secondary-100)); }
+html.dark .bg-secondary-200 { background-color: rgb(var(--color-secondary-200)); }
+html.dark .bg-secondary-300 { background-color: rgb(var(--color-secondary-300)); }
+html.dark .text-secondary-400 { color: rgb(var(--color-secondary-400)); }
+html.dark .text-secondary-500 { color: rgb(var(--color-secondary-500)); }
+html.dark .text-secondary-600 { color: rgb(var(--color-secondary-600)); }
+html.dark .border-secondary-200 { border-color: rgb(var(--color-secondary-200)); }
+html.dark .border-secondary-300 { border-color: rgb(var(--color-secondary-300)); }
+
+/* Primary */
+html.dark .text-primary-600 { color: rgb(var(--color-primary-600)); }
+html.dark .text-primary-800 { color: rgb(var(--color-primary-800)); }
+html.dark .bg-primary-50 { background-color: rgb(var(--color-primary-50)); }
+html.dark .border-primary-200 { border-color: rgb(var(--color-primary-200)); }
+html.dark .border-primary-300 { border-color: rgb(var(--color-primary-300)); }
+html.dark .hover\:border-primary-300:hover { border-color: rgb(var(--color-primary-300)); }
+
+/* Yellow (star ratings, pending status) */
+html.dark .bg-yellow-100 { background-color: rgb(113 63 18 / 0.3); }
+html.dark .text-yellow-800 { color: rgb(253 224 71); }
+html.dark .fill-yellow-400 { fill: rgb(250 204 21); }
+html.dark .text-yellow-400 { color: rgb(250 204 21); }
+html.dark .text-yellow-600 { color: rgb(250 204 21); }
+
+/* Green (approved status, hotel availability, approve button) */
+html.dark .bg-green-100 { background-color: rgb(20 83 45 / 0.3); }
+html.dark .text-green-600 { color: rgb(34 197 94); }
+html.dark .text-green-800 { color: rgb(134 239 172); }
+html.dark .bg-green-600 { background-color: rgb(22 163 74); }
+html.dark .hover\:bg-green-700:hover { background-color: rgb(21 128 61); }
+
+/* Red (rejected status, policy violations) */
+html.dark .bg-red-50 { background-color: rgb(127 29 29 / 0.2); }
+html.dark .bg-red-100 { background-color: rgb(127 29 29 / 0.3); }
+html.dark .text-red-600 { color: rgb(248 113 113); }
+html.dark .text-red-800 { color: rgb(252 165 165); }
+html.dark .border-red-200 { border-color: rgb(185 28 28 / 0.5); }
+html.dark .bg-red-600 { background-color: rgb(220 38 38); }
+html.dark .hover\:bg-red-700:hover { background-color: rgb(185 28 28); }
+
+/* Blue (info banners, ticketed status) */
+html.dark .bg-blue-50 { background-color: rgb(30 58 138 / 0.2); }
+html.dark .bg-blue-100 { background-color: rgb(30 58 138 / 0.3); }
+html.dark .text-blue-800 { color: rgb(147 197 253); }
+html.dark .border-blue-200 { border-color: rgb(30 64 175 / 0.5); }
+
+/* Cancelled */
+html.dark .bg-red-200 { background-color: rgb(127 29 29 / 0.4); }
+
+/* Global overrides for elements that use semantic colors directly */
+a {
+  color: rgb(var(--color-primary-600));
+}
+a:hover {
+  color: rgb(var(--color-primary-700));
+}
+
+/* Table styling */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+thead tr {
+  border-bottom: 1px solid rgb(var(--border-color));
+}
+th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgb(var(--text-secondary));
+}
+tbody tr {
+  border-bottom: 1px solid rgb(var(--border-color));
+}
+tbody tr:hover {
+  background-color: rgb(var(--bg-hover));
+}
+td {
+  padding: 0.75rem 1rem;
+}
