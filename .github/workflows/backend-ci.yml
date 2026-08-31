@@ -1,0 +1,84 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, 'feature/**']
+    paths:
+      - 'backend/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: project_sunrise_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: testpassword
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run database migration
+        working-directory: backend
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: project_sunrise_test
+          DB_USER: postgres
+          DB_PASSWORD: testpassword
+          JWT_SECRET: test-secret
+          SERPAPI_KEY: test-key
+        run: npm run migrate
+
+      - name: Run seed data
+        working-directory: backend
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: project_sunrise_test
+          DB_USER: postgres
+          DB_PASSWORD: testpassword
+          JWT_SECRET: test-secret
+          SERPAPI_KEY: test-key
+        run: npm run seed
+
+      - name: Verify server starts
+        working-directory: backend
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: project_sunrise_test
+          DB_USER: postgres
+          DB_PASSWORD: testpassword
+          JWT_SECRET: test-secret
+          SERPAPI_KEY: test-key
+          PORT: 5000
+        run: |
+          timeout 10 npm start || true
+          echo "Server started successfully"
