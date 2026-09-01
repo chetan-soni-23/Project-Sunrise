@@ -37,8 +37,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
         working-directory: backend
@@ -53,7 +51,9 @@ jobs:
           DB_USER: postgres
           DB_PASSWORD: testpassword
           JWT_SECRET: test-secret
+          JWT_EXPIRES_IN: 24h
           SERPAPI_KEY: test-key
+          NODE_ENV: test
         run: npm run migrate
 
       - name: Run seed data
@@ -65,7 +65,9 @@ jobs:
           DB_USER: postgres
           DB_PASSWORD: testpassword
           JWT_SECRET: test-secret
+          JWT_EXPIRES_IN: 24h
           SERPAPI_KEY: test-key
+          NODE_ENV: test
         run: npm run seed
 
       - name: Verify server starts
@@ -77,8 +79,10 @@ jobs:
           DB_USER: postgres
           DB_PASSWORD: testpassword
           JWT_SECRET: test-secret
+          JWT_EXPIRES_IN: 24h
           SERPAPI_KEY: test-key
           PORT: 5000
+          NODE_ENV: test
         run: |
           timeout 10 npm start || true
           echo "Server started successfully"
