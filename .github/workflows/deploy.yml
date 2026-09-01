@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 jobs:
-  deploy-backend:
+  verify-build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -16,54 +16,21 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install dependencies
+      - name: Install backend dependencies
         working-directory: backend
-        run: npm ci --omit=dev
+        run: npm ci
 
-      - name: Run migrations
+      - name: Verify backend can start
         working-directory: backend
-        env:
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          JWT_EXPIRES_IN: ${{ secrets.JWT_EXPIRES_IN }}
-          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
-        run: npm run migrate
+        run: node -e "require('./src/routes/auth'); require('./src/routes/flights'); require('./src/routes/hotels'); require('./src/routes/bookings'); require('./src/routes/policies'); require('./src/routes/dashboard'); console.log('All routes loaded successfully')"
 
-      - name: Seed database
-        working-directory: backend
-        env:
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          JWT_EXPIRES_IN: ${{ secrets.JWT_EXPIRES_IN }}
-          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
-        run: npm run seed
-
-  deploy-frontend:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install dependencies
+      - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
 
       - name: Build frontend
         working-directory: frontend
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: npm run build
+
+      - name: Verify build output
+        run: ls -la frontend/dist/ && echo "Build successful!"
