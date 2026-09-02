@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { UserCheck, Plus, Trash2, Calendar, Clock, AlertCircle, Users, ArrowRightLeft } from 'lucide-react';
+import { UserCheck, Plus, Trash2, Calendar, Clock, AlertCircle, Users, ArrowRightLeft, Edit2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Delegations = () => {
@@ -18,6 +18,7 @@ const Delegations = () => {
     endDate: '',
     reason: ''
   });
+  const [editingDelegation, setEditingDelegation] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -52,17 +53,40 @@ const Delegations = () => {
 
     setSubmitting(true);
     try {
-      await api.post('/delegations', formData);
-      toast.success('Delegation created successfully');
+      if (editingDelegation) {
+        await api.put(`/delegations/${editingDelegation.id}`, formData);
+        toast.success('Delegation updated successfully');
+      } else {
+        await api.post('/delegations', formData);
+        toast.success('Delegation created successfully');
+      }
       setShowForm(false);
+      setEditingDelegation(null);
       setFormData({ delegatedToId: '', startDate: '', endDate: '', reason: '' });
       fetchData();
     } catch (error) {
-      console.error('Failed to create delegation:', error);
-      toast.error(error.response?.data?.error || 'Failed to create delegation');
+      console.error('Failed to save delegation:', error);
+      toast.error(error.response?.data?.error || 'Failed to save delegation');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEdit = (delegation) => {
+    setEditingDelegation(delegation);
+    setFormData({
+      delegatedToId: delegation.delegated_to_id,
+      startDate: delegation.start_date ? delegation.start_date.split('T')[0] : '',
+      endDate: delegation.end_date ? delegation.end_date.split('T')[0] : '',
+      reason: delegation.reason || ''
+    });
+    setShowForm(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingDelegation(null);
+    setFormData({ delegatedToId: '', startDate: '', endDate: '', reason: '' });
+    setShowForm(false);
   };
 
   const handleRevoke = async (delegationId) => {
@@ -71,12 +95,27 @@ const Delegations = () => {
     }
 
     try {
-      await api.delete(`/delegations/${delegationId}`);
+      await api.put(`/delegations/${delegationId}/revoke`);
       toast.success('Delegation revoked successfully');
       fetchData();
     } catch (error) {
       console.error('Failed to revoke delegation:', error);
       toast.error('Failed to revoke delegation');
+    }
+  };
+
+  const handleDelete = async (delegationId) => {
+    if (!confirm('Are you sure you want to permanently delete this delegation? This cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await api.delete(`/delegations/${delegationId}`);
+      toast.success('Delegation deleted permanently');
+      fetchData();
+    } catch (error) {
+      console.error('Failed to delete delegation:', error);
+      toast.error('Failed to delete delegation');
     }
   };
 
@@ -114,7 +153,11 @@ const Delegations = () => {
           <h1 className="text-3xl font-bold text-primary-800">Approval Delegation</h1>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            setEditingDelegation(null);
+            setFormData({ delegatedToId: '', startDate: '', endDate: '', reason: '' });
+            setShowForm(!showForm);
+          }}
           className="flex items-center space-x-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
         >
           <Plus className="h-5 w-5" />
@@ -140,7 +183,9 @@ const Delegations = () => {
       {/* Create Delegation Form */}
       {showForm && (
         <div className="card">
-          <h2 className="text-lg font-semibold text-primary-800 mb-4">Create New Delegation</h2>
+          <h2 className="text-lg font-semibold text-primary-800 mb-4">
+            {editingDelegation ? 'Edit Delegation' : 'Create New Delegation'}
+          </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -206,11 +251,11 @@ const Delegations = () => {
                 disabled={submitting}
                 className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
               >
-                {submitting ? 'Creating...' : 'Create Delegation'}
+                {submitting ? 'Saving...' : editingDelegation ? 'Update Delegation' : 'Create Delegation'}
               </button>
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={handleCancelEdit}
                 className="bg-secondary-200 text-secondary-700 px-4 py-2 rounded-lg hover:bg-secondary-300 transition-colors"
               >
                 Cancel
@@ -316,15 +361,33 @@ const Delegations = () => {
                     </div>
                   </div>
 
-                  {isActive(delegation) && (
+                  <div className="flex items-center space-x-2">
+                    {isActive(delegation) && (
+                      <>
+                        <button
+                          onClick={() => handleEdit(delegation)}
+                          className="flex items-center space-x-1 text-primary-600 hover:text-primary-700 transition-colors"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleRevoke(delegation.id)}
+                          className="flex items-center space-x-1 text-orange-600 hover:text-orange-700 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                          <span>Revoke</span>
+                        </button>
+                      </>
+                    )}
                     <button
-                      onClick={() => handleRevoke(delegation.id)}
-                      className="flex items-center space-x-2 text-red-600 hover:text-red-700 transition-colors"
+                      onClick={() => handleDelete(delegation.id)}
+                      className="flex items-center space-x-1 text-red-600 hover:text-red-700 transition-colors"
                     >
                       <Trash2 className="h-4 w-4" />
-                      <span>Revoke</span>
+                      <span>Delete</span>
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
             ))

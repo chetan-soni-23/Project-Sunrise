@@ -140,6 +140,119 @@ const revokeDelegation = async (req, res) => {
   }
 };
 
+// Update a delegation
+const updateDelegation = async (req, res) => {
+  try {
+    const { delegationId } = req.params;
+    const userId = req.user.id;
+    const { delegatedToId, startDate, endDate, reason } = req.body;
+
+    // Check if delegation exists and belongs to current user
+    const existing = await pool.query(
+      'SELECT * FROM approval_delegations WHERE id = $1 AND original_approver_id = $2',
+      [delegationId, userId]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Delegation not found' });
+    }
+
+    // If changing the delegate, validate the new user
+    if (delegatedToId && delegatedToId !== existing.rows[0].delegated_to_id) {
+      const delegatedUser = await pool.query(
+        "SELECT id, name, role FROM users WHERE id = $1",
+        [delegatedToId]
+      );
+
+      if (delegatedUser.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (delegatedUser.rows[0].role !== 'approver' && delegatedUser.rows[0].role !== 'admin') {
+        return res.status(400).json({ error: 'Can only delegate to approvers or admins' });
+      }
+
+      // Cannot delegate to yourself
+      if (userId === parseInt(delegatedToId)) {
+        return res.status(400).json({ error: 'Cannot delegate to yourself' });
+      }
+
+      // Check for existing active delegation to the new person
+      const duplicateCheck = await pool.query(
+        `SELECT id FROM approval_delegations 
+         WHERE original_approver_id = $1 AND delegated_to_id = $2 AND is_active = true AND id != $3`,
+        [userId, delegatedToId, delegationId]
+      );
+
+      if (duplicateCheck.rows.length > 0) {
+        return res.status(400).json({ error: 'Active delegation to this user already exists' });
+      }
+    }
+
+    // Validate dates if provided
+    const newStartDate = startDate !== undefined ? startDate : existing.rows[0].start_date;
+    const newEndDate = endDate !== undefined ? endDate : existing.rows[0].end_date;
+    if (newStartDate && newEndDate && new Date(newStartDate) > new Date(newEndDate)) {
+      return res.status(400).json({ error: 'Start date must be before end date' });
+    }
+
+    const result = await pool.query(
+      `UPDATE approval_delegations 
+       SET delegated_to_id = COALESCE($1, delegated_to_id),
+           start_date = $2,
+           end_date = $3,
+           reason = COALESCE($4, reason),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5
+       RETURNING *`,
+      [
+        delegatedToId || null,
+        startDate !== undefined ? (startDate || null) : existing.rows[0].start_date,
+        endDate !== undefined ? (endDate || null) : existing.rows[0].end_date,
+        reason !== undefined ? (reason || null) : existing.rows[0].reason,
+        delegationId
+      ]
+    );
+
+    res.json({
+      success: true,
+      message: 'Delegation updated successfully',
+      delegation: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Update delegation error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Delete a delegation permanently
+const deleteDelegation = async (req, res) => {
+  try {
+    const { delegationId } = req.params;
+    const userId = req.user.id;
+
+    // Check if delegation exists and belongs to current user
+    const delegation = await pool.query(
+      'SELECT * FROM approval_delegations WHERE id = $1 AND original_approver_id = $2',
+      [delegationId, userId]
+    );
+
+    if (delegation.rows.length === 0) {
+      return res.status(404).json({ error: 'Delegation not found' });
+    }
+
+    await pool.query('DELETE FROM approval_delegations WHERE id = $1', [delegationId]);
+
+    res.json({
+      success: true,
+      message: 'Delegation deleted permanently'
+    });
+  } catch (error) {
+    console.error('Delete delegation error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 // Check if a delegation is active for a given approver
 const checkActiveDelegation = async (req, res) => {
   try {
@@ -188,6 +301,8 @@ module.exports = {
   createDelegation,
   getMyDelegations,
   getDelegatedToMe,
+  updateDelegation,
+  deleteDelegation,
   revokeDelegation,
   checkActiveDelegation,
   getApprovers

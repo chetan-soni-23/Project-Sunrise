@@ -4,6 +4,8 @@ const {
   createDelegation,
   getMyDelegations,
   getDelegatedToMe,
+  updateDelegation,
+  deleteDelegation,
   revokeDelegation,
   checkActiveDelegation,
   getApprovers
@@ -28,7 +30,13 @@ router.get('/received', getDelegatedToMe);
 // Check if a delegation is active for a specific approver
 router.get('/check/:approverId', checkActiveDelegation);
 
-// Revoke a delegation
-router.delete('/:delegationId', revokeDelegation);
+// Update a delegation
+router.put('/:delegationId', updateDelegation);
+
+// Revoke a delegation (soft delete - sets is_active to false)
+router.put('/:delegationId/revoke', revokeDelegation);
+
+// Delete a delegation permanently
+router.delete('/:delegationId', deleteDelegation);
 
 module.exports = router;
