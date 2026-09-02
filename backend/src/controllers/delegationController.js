@@ -41,6 +41,7 @@ const createDelegation = async (req, res) => {
       return res.status(400).json({ error: 'Start date must be before end date' });
     }
 
+    // Create the delegation
     const result = await pool.query(
       `INSERT INTO approval_delegations (original_approver_id, delegated_to_id, start_date, end_date, reason)
        VALUES ($1, $2, $3, $4, $5)
@@ -48,10 +49,20 @@ const createDelegation = async (req, res) => {
       [originalApproverId, delegatedToId, startDate || null, endDate || null, reason || null]
     );
 
+    // Transfer existing pending approvals to the delegate
+    const transferredApprovals = await pool.query(
+      `UPDATE approvals 
+       SET approver_id = $1, delegated_from = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE approver_id = $2 AND status = 'pending'
+       RETURNING id, booking_id`,
+      [delegatedToId, originalApproverId]
+    );
+
     res.status(201).json({
       success: true,
-      message: 'Delegation created successfully',
-      delegation: result.rows[0]
+      message: `Delegation created successfully. ${transferredApprovals.rowCount} pending approval(s) transferred.`,
+      delegation: result.rows[0],
+      transferred_count: transferredApprovals.rowCount
     });
   } catch (error) {
     console.error('Create delegation error:', error);
@@ -107,9 +118,7 @@ const getDelegatedToMe = async (req, res) => {
     console.error('Get delegated to me error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-};
-
-// Revoke a delegation
+};// Revoke a delegation
 const revokeDelegation = async (req, res) => {
   try {
     const { delegationId } = req.params;
@@ -125,14 +134,24 @@ const revokeDelegation = async (req, res) => {
       return res.status(404).json({ error: 'Delegation not found' });
     }
 
-    await pool.query(
-      'UPDATE approval_delegations SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
-      [delegationId]
+    const { delegated_to_id } = delegation.rows[0];
+
+    // Transfer pending approvals back to original approver
+    const transferredBack = await pool.query(
+      `UPDATE approvals 
+       SET approver_id = $1, delegated_from = NULL, updated_at = CURRENT_TIMESTAMP
+       WHERE approver_id = $2 AND delegated_from = $1 AND status = 'pending'
+       RETURNING id, booking_id`,
+      [userId, delegated_to_id]
     );
+
+    // Deactivate the delegation
+    await pool.query('UPDATE approval_delegations SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [delegationId]);
 
     res.json({
       success: true,
-      message: 'Delegation revoked successfully'
+      message: `Delegation revoked. ${transferredBack.rowCount} pending approval(s) transferred back.`,
+      transferred_back_count: transferredBack.rowCount
     });
   } catch (error) {
     console.error('Revoke delegation error:', error);
