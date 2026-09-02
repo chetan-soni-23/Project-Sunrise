@@ -95,10 +95,29 @@ const createBooking = async (req, res) => {
       );
 
       if (approversResult.rows.length > 0) {
+        const originalApproverId = approversResult.rows[0].id;
+        let effectiveApproverId = originalApproverId;
+        let delegatedFrom = null;
+
+        // Check for active delegation
+        const delegationResult = await pool.query(
+          `SELECT delegated_to_id FROM approval_delegations 
+           WHERE original_approver_id = $1 
+             AND is_active = true
+             AND (start_date IS NULL OR start_date <= CURRENT_DATE)
+             AND (end_date IS NULL OR end_date >= CURRENT_DATE)`,
+          [originalApproverId]
+        );
+
+        if (delegationResult.rows.length > 0) {
+          effectiveApproverId = delegationResult.rows[0].delegated_to_id;
+          delegatedFrom = originalApproverId;
+        }
+
         await pool.query(
-          `INSERT INTO approvals (booking_id, approver_id, status)
-           VALUES ($1, $2, 'pending')`,
-          [booking.id, approversResult.rows[0].id]
+          `INSERT INTO approvals (booking_id, approver_id, status, delegated_from)
+           VALUES ($1, $2, 'pending', $3)`,
+          [booking.id, effectiveApproverId, delegatedFrom]
         );
       }
     }
@@ -147,10 +166,13 @@ const getAllApprovals = async (req, res) => {
 
     const result = await pool.query(
       `SELECT b.*, u.name as employee_name, u.designation as employee_designation,
-              a.id as approval_id, a.status as approval_status, a.created_at as approval_date, a.comments as approval_comments
+              a.id as approval_id, a.status as approval_status, a.created_at as approval_date, a.comments as approval_comments,
+              a.delegated_from,
+              d.name as delegated_from_name
        FROM bookings b
        JOIN users u ON b.user_id = u.id
        JOIN approvals a ON b.id = a.booking_id
+       LEFT JOIN users d ON a.delegated_from = d.id
        WHERE a.approver_id = $1
        ORDER BY b.created_at DESC`,
       [approverId]
@@ -173,10 +195,13 @@ const getPendingApprovals = async (req, res) => {
 
     const result = await pool.query(
       `SELECT b.*, u.name as employee_name, u.designation as employee_designation,
-              a.id as approval_id, a.status as approval_status, a.created_at as approval_date
+              a.id as approval_id, a.status as approval_status, a.created_at as approval_date,
+              a.delegated_from,
+              d.name as delegated_from_name
        FROM bookings b
        JOIN users u ON b.user_id = u.id
        JOIN approvals a ON b.id = a.booking_id
+       LEFT JOIN users d ON a.delegated_from = d.id
        WHERE a.approver_id = $1 AND a.status = 'pending'
        ORDER BY b.created_at DESC`,
       [approverId]

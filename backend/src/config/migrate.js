@@ -76,6 +76,29 @@ const createTables = async () => {
       );
     `);
 
+    // Approval delegations table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS approval_delegations (
+        id SERIAL PRIMARY KEY,
+        original_approver_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        delegated_to_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        is_active BOOLEAN DEFAULT true,
+        start_date DATE,
+        end_date DATE,
+        reason TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Add delegated_from column to approvals table if not exists
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE approvals ADD COLUMN delegated_from INTEGER REFERENCES users(id);
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$;
+    `);
+
     // Search history table
     await client.query(`
       CREATE TABLE IF NOT EXISTS search_history (
@@ -95,6 +118,9 @@ const createTables = async () => {
       CREATE INDEX IF NOT EXISTS idx_bookings_created_at ON bookings(created_at);
       CREATE INDEX IF NOT EXISTS idx_approvals_booking_id ON approvals(booking_id);
       CREATE INDEX IF NOT EXISTS idx_approvals_approver_id ON approvals(approver_id);
+      CREATE INDEX IF NOT EXISTS idx_delegations_original ON approval_delegations(original_approver_id);
+      CREATE INDEX IF NOT EXISTS idx_delegations_delegated ON approval_delegations(delegated_to_id);
+      CREATE INDEX IF NOT EXISTS idx_delegations_active ON approval_delegations(is_active);
     `);
 
     await client.query('COMMIT');
