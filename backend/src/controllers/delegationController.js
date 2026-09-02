@@ -167,10 +167,28 @@ const checkActiveDelegation = async (req, res) => {
   }
 };
 
+// Get all approvers (for delegation dropdown)
+const getApprovers = async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, name, email, designation FROM users WHERE role IN ('approver', 'admin') ORDER BY name"
+    );
+
+    res.json({
+      success: true,
+      approvers: result.rows
+    });
+  } catch (error) {
+    console.error('Get approvers error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   createDelegation,
   getMyDelegations,
   getDelegatedToMe,
   revokeDelegation,
-  checkActiveDelegation
+  checkActiveDelegation,
+  getApprovers
 };

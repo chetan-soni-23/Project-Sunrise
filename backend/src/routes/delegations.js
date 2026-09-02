@@ -5,12 +5,16 @@ const {
   getMyDelegations,
   getDelegatedToMe,
   revokeDelegation,
-  checkActiveDelegation
+  checkActiveDelegation,
+  getApprovers
 } = require('../controllers/delegationController');
 const { authenticateToken, authorize } = require('../middleware/auth');
 
 // All routes require authentication
 router.use(authenticateToken);
+
+// Get all approvers (for delegation dropdown)
+router.get('/approvers', getApprovers);
 
 // Create a new delegation (approvers and admins only)
 router.post('/', authorize('approver', 'admin'), createDelegation);
