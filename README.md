@@ -194,7 +194,3 @@ project-sunrise/
 - **Frontend:** React 18, Tailwind CSS, React Router, Axios, Lucide Icons
 - **Backend:** Node.js, Express.js, PostgreSQL, JWT, bcryptjs
 - **Tools:** Vite, PostCSS, Nodemon
-
-## 📝 License
-
-This project is created for educational purposes as part of Project Sunrise assessment.
