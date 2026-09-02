@@ -31,8 +31,18 @@ const seedData = async () => {
     // Seed test users
     const salt = await bcrypt.genSalt(10);
     const testUsers = [
+      // Employees
       { name: 'John Employee', email: 'employee@test.com', password: 'password123', role: 'employee', designation: 'Executive', salary_band: 'B', department: 'Engineering' },
+      { name: 'Priya Developer', email: 'priya@test.com', password: 'password123', role: 'employee', designation: 'Senior Executive', salary_band: 'C', department: 'Engineering' },
+      { name: 'Amit Analyst', email: 'amit@test.com', password: 'password123', role: 'employee', designation: 'Junior Executive', salary_band: 'A', department: 'Finance' },
+      
+      // Approvers
       { name: 'Jane Manager', email: 'approver@test.com', password: 'password123', role: 'approver', designation: 'Manager', salary_band: 'D', department: 'Engineering' },
+      { name: 'Vikram Sen.Mgr', email: 'vikram@test.com', password: 'password123', role: 'approver', designation: 'Senior Manager', salary_band: 'D', department: 'Engineering' },
+      { name: 'Neha Director', email: 'neha@test.com', password: 'password123', role: 'approver', designation: 'Director', salary_band: 'E', department: 'Finance' },
+      { name: 'Raj VP', email: 'raj@test.com', password: 'password123', role: 'approver', designation: 'VP', salary_band: 'F', department: 'Operations' },
+      
+      // Admin
       { name: 'Admin User', email: 'admin@test.com', password: 'password123', role: 'admin', designation: 'Director', salary_band: 'E', department: 'Operations' }
     ];
 
@@ -49,8 +59,16 @@ const seedData = async () => {
     await client.query('COMMIT');
     console.log('Database seeded successfully!');
     console.log('\nTest Users:');
-    console.log('Employee: employee@test.com / password123');
-    console.log('Approver: approver@test.com / password123');
+    console.log('\n--- Employees ---');
+    console.log('John: employee@test.com / password123');
+    console.log('Priya: priya@test.com / password123');
+    console.log('Amit: amit@test.com / password123');
+    console.log('\n--- Approvers ---');
+    console.log('Jane: approver@test.com / password123');
+    console.log('Vikram: vikram@test.com / password123');
+    console.log('Neha: neha@test.com / password123');
+    console.log('Raj: raj@test.com / password123');
+    console.log('\n--- Admin ---');
     console.log('Admin: admin@test.com / password123');
   } catch (error) {
     await client.query('ROLLBACK');
