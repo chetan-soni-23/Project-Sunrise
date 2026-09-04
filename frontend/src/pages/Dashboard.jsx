@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { Plane, Building2, Calendar, TrendingUp, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Plane, Building2, Calendar, TrendingUp, Clock, CheckCircle, XCircle, CheckSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Dashboard = () => {
@@ -63,6 +63,12 @@ const Dashboard = () => {
             <Building2 className="h-5 w-5" />
             <span>Search Hotels</span>
           </Link>
+          {(user.role === 'approver' || user.role === 'admin') && (
+            <Link to="/approvals" className="btn-primary flex items-center space-x-2">
+              <CheckSquare className="h-5 w-5" />
+              <span>Approvals</span>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -115,6 +121,20 @@ const Dashboard = () => {
             <CheckCircle className="h-10 w-10 text-green-600" />
           </div>
         </div>
+
+        {(user.role === 'approver' || user.role === 'admin') && (
+          <Link to="/approvals" className="card hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-secondary-500">Pending Approvals</p>
+                <p className="text-2xl font-bold text-primary-800">
+                  {stats?.pending_approvals || 0}
+                </p>
+              </div>
+              <CheckSquare className="h-10 w-10 text-orange-600" />
+            </div>
+          </Link>
+        )}
       </div>
 
       {/* Recent Bookings */}
