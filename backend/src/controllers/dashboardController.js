@@ -122,13 +122,25 @@ const getUserStats = async (req, res) => {
       [userId]
     );
 
+    const stats = {
+      bookings_by_status: userBookings.rows,
+      total_spend: parseFloat(userSpend.rows[0].total),
+      recent_bookings: recentBookings.rows
+    };
+
+    // For approvers/admins, include pending approvals count (including delegated)
+    if (req.user.role === 'approver' || req.user.role === 'admin') {
+      const pendingApprovals = await pool.query(
+        `SELECT COUNT(*) as count FROM approvals 
+         WHERE approver_id = $1 AND status = 'pending'`,
+        [userId]
+      );
+      stats.pending_approvals = parseInt(pendingApprovals.rows[0].count);
+    }
+
     res.json({
       success: true,
-      stats: {
-        bookings_by_status: userBookings.rows,
-        total_spend: parseFloat(userSpend.rows[0].total),
-        recent_bookings: recentBookings.rows
-      }
+      stats
     });
   } catch (error) {
     console.error('User stats error:', error);
