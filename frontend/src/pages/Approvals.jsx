@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { CheckSquare, Check, X, Clock, Plane, Building2, AlertCircle, Ban } from 'lucide-react';
+import { CheckSquare, Check, X, Clock, Plane, Building2, AlertCircle, Ban, ArrowRightLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Approvals = () => {
@@ -157,6 +157,12 @@ const Approvals = () => {
                       Requested by: <span className="font-medium">{approval.employee_name}</span>
                       ({approval.employee_designation})
                     </p>
+                    {approval.delegated_from_name && (
+                      <p className="text-sm text-blue-600 mt-1 flex items-center space-x-1">
+                        <ArrowRightLeft className="h-3 w-3" />
+                        <span>Delegated by <span className="font-medium">{approval.delegated_from_name}</span></span>
+                      </p>
+                    )}
                     <p className="text-sm text-secondary-500">
                       {approval.booking_type === 'flight'
                         ? `Flight Class: ${approval.flight_class || 'Economy'}`
