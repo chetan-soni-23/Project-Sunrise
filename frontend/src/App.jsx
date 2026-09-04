@@ -13,6 +13,10 @@ import HotelSearch from './pages/HotelSearch';
 import MyBookings from './pages/MyBookings';
 import Approvals from './pages/Approvals';
 import AdminDashboard from './pages/AdminDashboard';
+import Delegations from './pages/Delegations';
+import Profile from './pages/Profile';
+import UserManagement from './pages/UserManagement';
+import PolicyManagement from './pages/PolicyManagement';
 
 // Components
 import Navbar from './components/Navbar';
@@ -59,9 +63,33 @@ function AppContent() {
             </PrivateRoute>
           } />
           
+          <Route path="/delegations" element={
+            <PrivateRoute roles={['approver', 'admin']}>
+              <Delegations />
+            </PrivateRoute>
+          } />
+          
+          <Route path="/profile" element={
+            <PrivateRoute>
+              <Profile />
+            </PrivateRoute>
+          } />
+
           <Route path="/admin" element={
             <PrivateRoute roles={['admin']}>
               <AdminDashboard />
+            </PrivateRoute>
+          } />
+
+          <Route path="/admin/users" element={
+            <PrivateRoute roles={['admin']}>
+              <UserManagement />
+            </PrivateRoute>
+          } />
+
+          <Route path="/admin/policies" element={
+            <PrivateRoute roles={['admin']}>
+              <PolicyManagement />
             </PrivateRoute>
           } />
           
