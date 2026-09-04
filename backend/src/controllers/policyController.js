@@ -93,14 +93,6 @@ const validateBooking = async (req, res) => {
       }
     }
 
-    // Check daily allowance
-    if (totalCost && policy.daily_allowance) {
-      // Assuming trip is 1 day for simplicity
-      if (totalCost > policy.daily_allowance) {
-        violations.push(`Cost ₹${totalCost} exceeds daily allowance of ₹${policy.daily_allowance}`);
-      }
-    }
-
     const isCompliant = violations.length === 0;
 
     res.json({
@@ -111,7 +103,6 @@ const validateBooking = async (req, res) => {
         designation: policy.designation,
         max_flight_class: policy.max_flight_class,
         max_hotel_stars: policy.max_hotel_stars,
-        daily_allowance: policy.daily_allowance,
         requires_approval: policy.requires_approval
       }
     });
@@ -124,20 +115,18 @@ const validateBooking = async (req, res) => {
 // Create/Update policy (admin only)
 const upsertPolicy = async (req, res) => {
   try {
-    const { designation, maxFlightClass, maxHotelStars, dailyAllowance, maxTripDuration, requiresApproval } = req.body;
+    const { designation, maxFlightClass, maxHotelStars, requiresApproval } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO travel_policies (designation, max_flight_class, max_hotel_stars, daily_allowance, max_trip_duration, requires_approval)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO travel_policies (designation, max_flight_class, max_hotel_stars, requires_approval)
+       VALUES ($1, $2, $3, $4)
        ON CONFLICT (designation) 
        DO UPDATE SET 
          max_flight_class = EXCLUDED.max_flight_class,
          max_hotel_stars = EXCLUDED.max_hotel_stars,
-         daily_allowance = EXCLUDED.daily_allowance,
-         max_trip_duration = EXCLUDED.max_trip_duration,
          requires_approval = EXCLUDED.requires_approval
        RETURNING *`,
-      [designation, maxFlightClass, maxHotelStars, dailyAllowance, maxTripDuration, requiresApproval]
+      [designation, maxFlightClass, maxHotelStars, requiresApproval]
     );
 
     res.json({
@@ -150,4 +139,28 @@ const upsertPolicy = async (req, res) => {
   }
 };
 
-module.exports = { getPolicies, getPolicyByDesignation, validateBooking, upsertPolicy };
+// Delete a policy
+const deletePolicy = async (req, res) => {
+  try {
+    const { designation } = req.params;
+
+    const result = await pool.query(
+      'DELETE FROM travel_policies WHERE designation = $1 RETURNING *',
+      [designation]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Policy not found' });
+    }
+
+    res.json({
+      success: true,
+      message: `Policy for '${designation}' deleted successfully`
+    });
+  } catch (error) {
+    console.error('Delete policy error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+module.exports = { getPolicies, getPolicyByDesignation, validateBooking, upsertPolicy, deletePolicy };
