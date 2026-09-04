@@ -9,6 +9,8 @@ const hotelRoutes = require('./routes/hotels');
 const bookingRoutes = require('./routes/bookings');
 const policyRoutes = require('./routes/policies');
 const dashboardRoutes = require('./routes/dashboard');
+const delegationRoutes = require('./routes/delegations');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -37,6 +39,8 @@ app.use('/api/hotels', hotelRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/policies', policyRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/delegations', delegationRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

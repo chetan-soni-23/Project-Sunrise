@@ -27,7 +27,8 @@ const Register = () => {
     'Senior Manager',
     'Director',
     'VP',
-    'SVP'
+    'SVP',
+    'CEO/Founder'
   ];
 
   const salaryBands = ['A', 'B', 'C', 'D', 'E', 'F'];
