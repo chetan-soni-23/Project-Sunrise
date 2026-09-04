@@ -181,10 +181,51 @@ const FlightSearch = () => {
       {searched && (
         <div className="card">
           <h2 className="text-xl font-semibold text-primary-800 mb-4">
-            Search Results ({flights.length} flights found)
+            Search Results ({loading ? '...' : `${flights.length} flights found`})
           </h2>
 
-          {flights.length > 0 ? (
+          {loading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="border border-secondary-200 rounded-lg p-4 bg-card animate-pulse">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="text-center space-y-1">
+                        <div className="h-5 w-16 bg-secondary-200 rounded"></div>
+                        <div className="h-3 w-12 bg-secondary-100 rounded"></div>
+                      </div>
+                      <div className="flex items-center text-secondary-300">
+                        <div className="w-16 h-px bg-secondary-200"></div>
+                        <div className="h-4 w-4 mx-2 bg-secondary-200 rounded-full"></div>
+                        <div className="w-16 h-px bg-secondary-200"></div>
+                      </div>
+                      <div className="text-center space-y-1">
+                        <div className="h-5 w-16 bg-secondary-200 rounded"></div>
+                        <div className="h-3 w-12 bg-secondary-100 rounded"></div>
+                      </div>
+                    </div>
+                    <div className="text-center space-y-1">
+                      <div className="h-4 w-14 bg-secondary-200 rounded"></div>
+                      <div className="h-3 w-10 bg-secondary-100 rounded"></div>
+                    </div>
+                    <div className="text-center space-y-1">
+                      <div className="h-4 w-16 bg-secondary-200 rounded"></div>
+                      <div className="h-3 w-12 bg-secondary-100 rounded"></div>
+                    </div>
+                    <div className="text-center space-y-1">
+                      <div className="h-4 w-14 bg-secondary-200 rounded"></div>
+                      <div className="h-3 w-12 bg-secondary-100 rounded"></div>
+                    </div>
+                    <div className="text-right space-y-1">
+                      <div className="h-7 w-20 bg-secondary-200 rounded ml-auto"></div>
+                      <div className="h-3 w-14 bg-secondary-100 rounded ml-auto"></div>
+                    </div>
+                    <div className="h-9 w-20 bg-primary-200 rounded"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : flights.length > 0 ? (
             <div className="space-y-4">
               {flights.map((flight) => (
                 <div
