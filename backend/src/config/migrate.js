@@ -29,10 +29,9 @@ const createTables = async () => {
         designation VARCHAR(50) NOT NULL,
         max_flight_class VARCHAR(20) NOT NULL DEFAULT 'economy',
         max_hotel_stars INTEGER NOT NULL DEFAULT 3,
-        daily_allowance DECIMAL(10,2) NOT NULL DEFAULT 50.00,
-        max_trip_duration INTEGER NOT NULL DEFAULT 7,
         requires_approval BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (designation)
       );
     `);
 
@@ -72,8 +71,32 @@ const createTables = async () => {
         status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
         comments TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (booking_id, approver_id)
+      );
+    `);
+
+    // Approval delegations table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS approval_delegations (
+        id SERIAL PRIMARY KEY,
+        original_approver_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        delegated_to_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        is_active BOOLEAN DEFAULT true,
+        start_date DATE,
+        end_date DATE,
+        reason TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    // Add delegated_from column to approvals table if not exists
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE approvals ADD COLUMN delegated_from INTEGER REFERENCES users(id);
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$;
     `);
 
     // Search history table
@@ -95,6 +118,14 @@ const createTables = async () => {
       CREATE INDEX IF NOT EXISTS idx_bookings_created_at ON bookings(created_at);
       CREATE INDEX IF NOT EXISTS idx_approvals_booking_id ON approvals(booking_id);
       CREATE INDEX IF NOT EXISTS idx_approvals_approver_id ON approvals(approver_id);
+      CREATE INDEX IF NOT EXISTS idx_delegations_original ON approval_delegations(original_approver_id);
+      CREATE INDEX IF NOT EXISTS idx_delegations_delegated ON approval_delegations(delegated_to_id);
+      CREATE INDEX IF NOT EXISTS idx_delegations_active ON approval_delegations(is_active);
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_delegations_active_pair
+        ON approval_delegations(original_approver_id, delegated_to_id)
+        WHERE is_active = true;
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_approvals_booking_approver
+        ON approvals(booking_id, approver_id);
     `);
 
     await client.query('COMMIT');

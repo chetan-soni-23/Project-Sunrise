@@ -9,30 +9,41 @@ const seedData = async () => {
 
     // Seed travel policies
     const policies = [
-      { designation: 'Junior Executive', max_flight_class: 'economy', max_hotel_stars: 2, daily_allowance: 50, max_trip_duration: 5, requires_approval: true },
-      { designation: 'Executive', max_flight_class: 'economy', max_hotel_stars: 3, daily_allowance: 75, max_trip_duration: 7, requires_approval: true },
-      { designation: 'Senior Executive', max_flight_class: 'premium_economy', max_hotel_stars: 3, daily_allowance: 100, max_trip_duration: 7, requires_approval: true },
-      { designation: 'Manager', max_flight_class: 'premium_economy', max_hotel_stars: 4, daily_allowance: 125, max_trip_duration: 10, requires_approval: true },
-      { designation: 'Senior Manager', max_flight_class: 'business', max_hotel_stars: 4, daily_allowance: 150, max_trip_duration: 10, requires_approval: true },
-      { designation: 'Director', max_flight_class: 'business', max_hotel_stars: 5, daily_allowance: 200, max_trip_duration: 14, requires_approval: false },
-      { designation: 'VP', max_flight_class: 'business', max_hotel_stars: 5, daily_allowance: 250, max_trip_duration: 14, requires_approval: false },
-      { designation: 'SVP', max_flight_class: 'first', max_hotel_stars: 5, daily_allowance: 300, max_trip_duration: 21, requires_approval: false }
+      { designation: 'Junior Executive', max_flight_class: 'economy', max_hotel_stars: 2, requires_approval: true },
+      { designation: 'Executive', max_flight_class: 'economy', max_hotel_stars: 3, requires_approval: true },
+      { designation: 'Senior Executive', max_flight_class: 'premium_economy', max_hotel_stars: 3, requires_approval: true },
+      { designation: 'Manager', max_flight_class: 'premium_economy', max_hotel_stars: 4, requires_approval: true },
+      { designation: 'Senior Manager', max_flight_class: 'business', max_hotel_stars: 4, requires_approval: true },
+      { designation: 'Director', max_flight_class: 'business', max_hotel_stars: 5, requires_approval: false },
+      { designation: 'VP', max_flight_class: 'business', max_hotel_stars: 5, requires_approval: false },
+      { designation: 'SVP', max_flight_class: 'first', max_hotel_stars: 5, requires_approval: false },
+      { designation: 'CEO/Founder', max_flight_class: 'first', max_hotel_stars: 5, requires_approval: false }
     ];
 
     for (const policy of policies) {
       await client.query(
-        `INSERT INTO travel_policies (designation, max_flight_class, max_hotel_stars, daily_allowance, max_trip_duration, requires_approval)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO travel_policies (designation, max_flight_class, max_hotel_stars, requires_approval)
+         VALUES ($1, $2, $3, $4)
          ON CONFLICT DO NOTHING`,
-        [policy.designation, policy.max_flight_class, policy.max_hotel_stars, policy.daily_allowance, policy.max_trip_duration, policy.requires_approval]
+        [policy.designation, policy.max_flight_class, policy.max_hotel_stars, policy.requires_approval]
       );
     }
 
     // Seed test users
     const salt = await bcrypt.genSalt(10);
     const testUsers = [
+      // Employees
       { name: 'John Employee', email: 'employee@test.com', password: 'password123', role: 'employee', designation: 'Executive', salary_band: 'B', department: 'Engineering' },
+      { name: 'Priya Developer', email: 'priya@test.com', password: 'password123', role: 'employee', designation: 'Senior Executive', salary_band: 'C', department: 'Engineering' },
+      { name: 'Amit Analyst', email: 'amit@test.com', password: 'password123', role: 'employee', designation: 'Junior Executive', salary_band: 'A', department: 'Finance' },
+      
+      // Approvers
       { name: 'Jane Manager', email: 'approver@test.com', password: 'password123', role: 'approver', designation: 'Manager', salary_band: 'D', department: 'Engineering' },
+      { name: 'Vikram Sen.Mgr', email: 'vikram@test.com', password: 'password123', role: 'approver', designation: 'Senior Manager', salary_band: 'D', department: 'Engineering' },
+      { name: 'Neha Director', email: 'neha@test.com', password: 'password123', role: 'approver', designation: 'Director', salary_band: 'E', department: 'Finance' },
+      { name: 'Raj VP', email: 'raj@test.com', password: 'password123', role: 'approver', designation: 'VP', salary_band: 'F', department: 'Operations' },
+      
+      // Admin
       { name: 'Admin User', email: 'admin@test.com', password: 'password123', role: 'admin', designation: 'Director', salary_band: 'E', department: 'Operations' }
     ];
 
@@ -49,8 +60,16 @@ const seedData = async () => {
     await client.query('COMMIT');
     console.log('Database seeded successfully!');
     console.log('\nTest Users:');
-    console.log('Employee: employee@test.com / password123');
-    console.log('Approver: approver@test.com / password123');
+    console.log('\n--- Employees ---');
+    console.log('John: employee@test.com / password123');
+    console.log('Priya: priya@test.com / password123');
+    console.log('Amit: amit@test.com / password123');
+    console.log('\n--- Approvers ---');
+    console.log('Jane: approver@test.com / password123');
+    console.log('Vikram: vikram@test.com / password123');
+    console.log('Neha: neha@test.com / password123');
+    console.log('Raj: raj@test.com / password123');
+    console.log('\n--- Admin ---');
     console.log('Admin: admin@test.com / password123');
   } catch (error) {
     await client.query('ROLLBACK');
