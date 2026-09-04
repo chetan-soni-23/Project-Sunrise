@@ -208,10 +208,44 @@ const HotelSearch = () => {
       {searched && (
         <div className="card">
           <h2 className="text-xl font-semibold text-primary-800 mb-4">
-            Search Results ({hotels.length} hotels found)
+            Search Results ({loading ? '...' : `${hotels.length} hotels found`})
           </h2>
 
-          {hotels.length > 0 ? (
+          {loading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="border border-secondary-200 rounded-lg overflow-hidden bg-card animate-pulse flex flex-col md:flex-row">
+                  <div className="w-full md:w-48 lg:w-56 h-48 md:h-auto bg-secondary-200"></div>
+                  <div className="flex-1 p-4 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-2">
+                        <div className="h-5 w-40 bg-secondary-200 rounded"></div>
+                        <div className="h-4 w-32 bg-secondary-100 rounded"></div>
+                        <div className="flex space-x-1">
+                          {[1, 2, 3].map((s) => (
+                            <div key={s} className="h-4 w-4 bg-secondary-200 rounded"></div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-1 text-right">
+                        <div className="h-7 w-20 bg-secondary-200 rounded ml-auto"></div>
+                        <div className="h-3 w-14 bg-secondary-100 rounded ml-auto"></div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {[1, 2, 3].map((a) => (
+                        <div key={a} className="h-6 w-16 bg-secondary-100 rounded"></div>
+                      ))}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="h-4 w-8 bg-green-100 rounded"></div>
+                      <div className="h-3 w-20 bg-secondary-100 rounded"></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : hotels.length > 0 ? (
             <div className="space-y-4">
               {hotels.map((hotel) => (
                 <div
