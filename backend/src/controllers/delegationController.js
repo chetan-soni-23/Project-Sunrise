@@ -41,29 +41,42 @@ const createDelegation = async (req, res) => {
       return res.status(400).json({ error: 'Start date must be before end date' });
     }
 
-    // Create the delegation
-    const result = await pool.query(
-      `INSERT INTO approval_delegations (original_approver_id, delegated_to_id, start_date, end_date, reason)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [originalApproverId, delegatedToId, startDate || null, endDate || null, reason || null]
-    );
+    // Create delegation and transfer approvals atomically
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    // Transfer existing pending approvals to the delegate
-    const transferredApprovals = await pool.query(
-      `UPDATE approvals 
-       SET approver_id = $1, delegated_from = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE approver_id = $2 AND status = 'pending'
-       RETURNING id, booking_id`,
-      [delegatedToId, originalApproverId]
-    );
+      // Create the delegation
+      const result = await client.query(
+        `INSERT INTO approval_delegations (original_approver_id, delegated_to_id, start_date, end_date, reason)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [originalApproverId, delegatedToId, startDate || null, endDate || null, reason || null]
+      );
 
-    res.status(201).json({
-      success: true,
-      message: `Delegation created successfully. ${transferredApprovals.rowCount} pending approval(s) transferred.`,
-      delegation: result.rows[0],
-      transferred_count: transferredApprovals.rowCount
-    });
+      // Transfer existing pending approvals to the delegate
+      const transferredApprovals = await client.query(
+        `UPDATE approvals 
+         SET approver_id = $1, delegated_from = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE approver_id = $2 AND status = 'pending'
+         RETURNING id, booking_id`,
+        [delegatedToId, originalApproverId]
+      );
+
+      await client.query('COMMIT');
+
+      res.status(201).json({
+        success: true,
+        message: `Delegation created successfully. ${transferredApprovals.rowCount} pending approval(s) transferred.`,
+        delegation: result.rows[0],
+        transferred_count: transferredApprovals.rowCount
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     if (error.code === '23505') {
       // Could be duplicate delegation pair OR approval transfer conflict
@@ -143,23 +156,36 @@ const revokeDelegation = async (req, res) => {
 
     const { delegated_to_id } = delegation.rows[0];
 
-    // Transfer pending approvals back to original approver
-    const transferredBack = await pool.query(
-      `UPDATE approvals 
-       SET approver_id = $1, delegated_from = NULL, updated_at = CURRENT_TIMESTAMP
-       WHERE approver_id = $2 AND delegated_from = $1 AND status = 'pending'
-       RETURNING id, booking_id`,
-      [userId, delegated_to_id]
-    );
+    // Revoke delegation and transfer approvals atomically
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    // Deactivate the delegation
-    await pool.query('UPDATE approval_delegations SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [delegationId]);
+      // Transfer pending approvals back to original approver
+      const transferredBack = await client.query(
+        `UPDATE approvals 
+         SET approver_id = $1, delegated_from = NULL, updated_at = CURRENT_TIMESTAMP
+         WHERE approver_id = $2 AND delegated_from = $1 AND status = 'pending'
+         RETURNING id, booking_id`,
+        [userId, delegated_to_id]
+      );
 
-    res.json({
-      success: true,
-      message: `Delegation revoked. ${transferredBack.rowCount} pending approval(s) transferred back.`,
-      transferred_back_count: transferredBack.rowCount
-    });
+      // Deactivate the delegation
+      await client.query('UPDATE approval_delegations SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [delegationId]);
+
+      await client.query('COMMIT');
+
+      res.json({
+        success: true,
+        message: `Delegation revoked. ${transferredBack.rowCount} pending approval(s) transferred back.`,
+        transferred_back_count: transferredBack.rowCount
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error('Revoke delegation error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -226,43 +252,56 @@ const updateDelegation = async (req, res) => {
     const newDelegateId = delegatedToId ? parseInt(delegatedToId) : oldDelegateId;
     const delegateChanged = delegatedToId && newDelegateId !== oldDelegateId;
 
-    const result = await pool.query(
-      `UPDATE approval_delegations 
-       SET delegated_to_id = COALESCE($1, delegated_to_id),
-           start_date = $2,
-           end_date = $3,
-           reason = COALESCE($4, reason),
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5
-       RETURNING *`,
-      [
-        delegatedToId || null,
-        startDate !== undefined ? (startDate || null) : existing.rows[0].start_date,
-        endDate !== undefined ? (endDate || null) : existing.rows[0].end_date,
-        reason !== undefined ? (reason || null) : existing.rows[0].reason,
-        delegationId
-      ]
-    );
+    // Update delegation and transfer approvals atomically
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    // Transfer pending approvals if the delegate changed
-    let transferredCount = 0;
-    if (delegateChanged) {
-      const transferred = await pool.query(
-        `UPDATE approvals 
-         SET approver_id = $1, delegated_from = $2, updated_at = CURRENT_TIMESTAMP
-         WHERE approver_id = $3 AND delegated_from = $2 AND status = 'pending'
-         RETURNING id, booking_id`,
-        [newDelegateId, userId, oldDelegateId]
+      const result = await client.query(
+        `UPDATE approval_delegations 
+         SET delegated_to_id = COALESCE($1, delegated_to_id),
+             start_date = $2,
+             end_date = $3,
+             reason = COALESCE($4, reason),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $5
+         RETURNING *`,
+        [
+          delegatedToId || null,
+          startDate !== undefined ? (startDate || null) : existing.rows[0].start_date,
+          endDate !== undefined ? (endDate || null) : existing.rows[0].end_date,
+          reason !== undefined ? (reason || null) : existing.rows[0].reason,
+          delegationId
+        ]
       );
-      transferredCount = transferred.rowCount;
-    }
 
-    res.json({
-      success: true,
-      message: `Delegation updated successfully${delegateChanged ? `. ${transferredCount} pending approval(s) transferred to new delegate.` : ''}`,
-      delegation: result.rows[0],
-      transferred_count: transferredCount
-    });
+      // Transfer pending approvals if the delegate changed
+      let transferredCount = 0;
+      if (delegateChanged) {
+        const transferred = await client.query(
+          `UPDATE approvals 
+           SET approver_id = $1, delegated_from = $2, updated_at = CURRENT_TIMESTAMP
+           WHERE approver_id = $3 AND delegated_from = $2 AND status = 'pending'
+           RETURNING id, booking_id`,
+          [newDelegateId, userId, oldDelegateId]
+        );
+        transferredCount = transferred.rowCount;
+      }
+
+      await client.query('COMMIT');
+
+      res.json({
+        success: true,
+        message: `Delegation updated successfully${delegateChanged ? `. ${transferredCount} pending approval(s) transferred to new delegate.` : ''}`,
+        delegation: result.rows[0],
+        transferred_count: transferredCount
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     if (error.code === '23505') {
       if (error.constraint === 'uq_approvals_booking_approver') {
@@ -293,26 +332,39 @@ const deleteDelegation = async (req, res) => {
 
     const { delegated_to_id, is_active } = delegation.rows[0];
 
-    // Transfer pending approvals back if delegation is still active
-    let transferredCount = 0;
-    if (is_active) {
-      const transferred = await pool.query(
-        `UPDATE approvals 
-         SET approver_id = $1, delegated_from = NULL, updated_at = CURRENT_TIMESTAMP
-         WHERE approver_id = $2 AND delegated_from = $1 AND status = 'pending'
-         RETURNING id, booking_id`,
-        [userId, delegated_to_id]
-      );
-      transferredCount = transferred.rowCount;
+    // Transfer approvals and delete delegation atomically
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Transfer pending approvals back if delegation is still active
+      let transferredCount = 0;
+      if (is_active) {
+        const transferred = await client.query(
+          `UPDATE approvals 
+           SET approver_id = $1, delegated_from = NULL, updated_at = CURRENT_TIMESTAMP
+           WHERE approver_id = $2 AND delegated_from = $1 AND status = 'pending'
+           RETURNING id, booking_id`,
+          [userId, delegated_to_id]
+        );
+        transferredCount = transferred.rowCount;
+      }
+
+      await client.query('DELETE FROM approval_delegations WHERE id = $1', [delegationId]);
+
+      await client.query('COMMIT');
+
+      res.json({
+        success: true,
+        message: `Delegation deleted permanently${is_active ? `. ${transferredCount} pending approval(s) transferred back.` : ''}`,
+        transferred_back_count: transferredCount
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-
-    await pool.query('DELETE FROM approval_delegations WHERE id = $1', [delegationId]);
-
-    res.json({
-      success: true,
-      message: `Delegation deleted permanently${is_active ? `. ${transferredCount} pending approval(s) transferred back.` : ''}`,
-      transferred_back_count: transferredCount
-    });
   } catch (error) {
     console.error('Delete delegation error:', error);
     res.status(500).json({ error: 'Internal server error' });
