@@ -68,7 +68,7 @@ const createTables = async () => {
         id SERIAL PRIMARY KEY,
         booking_id INTEGER REFERENCES bookings(id) ON DELETE CASCADE,
         approver_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
+        status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
         comments TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -96,6 +96,16 @@ const createTables = async () => {
       DO $$ BEGIN
         ALTER TABLE approvals ADD COLUMN delegated_from INTEGER REFERENCES users(id);
       EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$;
+    `);
+
+    // Update approvals CHECK constraint to include 'cancelled' status
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE approvals DROP CONSTRAINT IF EXISTS approvals_status_check;
+        ALTER TABLE approvals ADD CONSTRAINT approvals_status_check
+          CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled'));
+      EXCEPTION WHEN others THEN NULL;
       END $$;
     `);
 
