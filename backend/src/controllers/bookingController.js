@@ -70,16 +70,133 @@ const createBooking = async (req, res) => {
       }
     }
 
+    // Determine if approval is needed and find approver BEFORE creating the booking
+    const requiresApproval = policyResult.rows.length > 0 && policyResult.rows[0].requires_approval;
+    let originalApproverId = null;
+
+    if (requiresApproval) {
+      // Find the appropriate approver using hierarchy:
+      // 1. User's direct manager (if they have one and it's an approver)
+      // 2. Walk up the management chain to find an approver
+      // 3. Fall back to department head (approver in same department)
+      // 4. Fall back to any approver (not self)
+      // 5. Fall back to admin
+      
+      // Get user's info including manager_id and department
+      const userInfoResult = await pool.query(
+        'SELECT manager_id, department FROM users WHERE id = $1',
+        [userId]
+      );
+      const userInfo = userInfoResult.rows[0];
+
+      // Strategy 1: Walk up the management chain
+      if (userInfo.manager_id) {
+        let currentManagerId = userInfo.manager_id;
+        const visitedManagers = new Set([userId]); // Prevent infinite loops
+        
+        while (currentManagerId && !visitedManagers.has(currentManagerId)) {
+          visitedManagers.add(currentManagerId);
+          
+          const managerResult = await pool.query(
+            'SELECT id, role, department FROM users WHERE id = $1',
+            [currentManagerId]
+          );
+          
+          if (managerResult.rows.length === 0) break;
+          
+          const manager = managerResult.rows[0];
+          
+          // If manager is an approver, use them (unless they are the booking creator)
+          if (manager.role === 'approver' && manager.id !== userId) {
+            originalApproverId = manager.id;
+            break;
+          }
+          
+          // Move up to the next manager
+          const nextManagerResult = await pool.query(
+            'SELECT manager_id FROM users WHERE id = $1',
+            [currentManagerId]
+          );
+          const nextManagerRow = nextManagerResult.rows[0];
+          currentManagerId = nextManagerRow?.manager_id;
+        }
+      }
+
+      // Strategy 2: Fall back to department head (approver in same department)
+      if (!originalApproverId && userInfo.department) {
+        const deptHeadResult = await pool.query(
+          `SELECT id FROM users 
+           WHERE role = 'approver' 
+             AND department = $1 
+             AND id != $2
+           ORDER BY 
+             CASE designation
+               WHEN 'VP' THEN 1
+               WHEN 'Senior Manager' THEN 2
+               WHEN 'Manager' THEN 3
+               ELSE 4
+             END
+           LIMIT 1`,
+          [userInfo.department, userId]
+        );
+        
+        if (deptHeadResult.rows.length > 0) {
+          originalApproverId = deptHeadResult.rows[0].id;
+        }
+      }
+
+      // Strategy 3: Fall back to any approver (not the booking creator)
+      if (!originalApproverId) {
+        const fallbackResult = await pool.query(
+          `SELECT id FROM users 
+           WHERE role = 'approver' 
+             AND id != $1
+           LIMIT 1`,
+          [userId]
+        );
+        
+        if (fallbackResult.rows.length > 0) {
+          originalApproverId = fallbackResult.rows[0].id;
+        }
+      }
+
+      // Strategy 4: Fall back to admin if no approver found
+      if (!originalApproverId) {
+        const adminResult = await pool.query(
+          `SELECT id FROM users 
+           WHERE role = 'admin' 
+             AND id != $1
+           LIMIT 1`,
+          [userId]
+        );
+        
+        if (adminResult.rows.length > 0) {
+          originalApproverId = adminResult.rows[0].id;
+        }
+      }
+    }
+
+    // Determine initial booking status:
+    // - 'approved' if no approval required by policy
+    // - 'approved' if approval required but no approver could be found (prevent zombie bookings)
+    // - 'pending' if approval required and approver found
+    const requiresApprovalFlow = requiresApproval && originalApproverId;
+    const initialStatus = requiresApprovalFlow ? 'pending' : 'approved';
+
+    if (requiresApproval && !originalApproverId) {
+      console.warn(`Approval required but no approver found for user ${userId} — auto-approving booking`);
+    }
+
     // Create booking
     const result = await pool.query(
       `INSERT INTO bookings (
         user_id, booking_type, status, travel_date, return_date,
         from_city, to_city, hotel_name, hotel_city, check_in, check_out,
         flight_class, hotel_stars, total_cost, policy_compliant, policy_violations, notes
-      ) VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        RETURNING *`,
       [
-        userId, bookingType, travelDate, returnDate,
+        userId, bookingType, initialStatus, travelDate, returnDate,
         fromCity, toCity, hotelName, hotelCity, checkIn, checkOut,
         flightClass, hotelStars, totalCost, policyCompliant, policyViolations, notes
       ]
@@ -87,44 +204,42 @@ const createBooking = async (req, res) => {
 
     const booking = result.rows[0];
 
-    // Create approval request if policy requires it
-    if (policyResult.rows.length > 0 && policyResult.rows[0].requires_approval) {
-      // Find approvers (users with 'approver' role)
-      const approversResult = await pool.query(
-        "SELECT id FROM users WHERE role = 'approver' LIMIT 1"
+    // Create approval request only if we have an approver and approval is required
+    if (requiresApprovalFlow && originalApproverId) {
+      let effectiveApproverId = originalApproverId;
+      let delegatedFrom = null;
+
+      // Check for active delegation
+      const delegationResult = await pool.query(
+        `SELECT delegated_to_id FROM approval_delegations 
+         WHERE original_approver_id = $1 
+           AND is_active = true
+           AND (start_date IS NULL OR start_date <= CURRENT_DATE)
+           AND (end_date IS NULL OR end_date >= CURRENT_DATE)`,
+        [originalApproverId]
       );
 
-      if (approversResult.rows.length > 0) {
-        const originalApproverId = approversResult.rows[0].id;
-        let effectiveApproverId = originalApproverId;
-        let delegatedFrom = null;
-
-        // Check for active delegation
-        const delegationResult = await pool.query(
-          `SELECT delegated_to_id FROM approval_delegations 
-           WHERE original_approver_id = $1 
-             AND is_active = true
-             AND (start_date IS NULL OR start_date <= CURRENT_DATE)
-             AND (end_date IS NULL OR end_date >= CURRENT_DATE)`,
-          [originalApproverId]
-        );
-
-        if (delegationResult.rows.length > 0) {
-          effectiveApproverId = delegationResult.rows[0].delegated_to_id;
+      if (delegationResult.rows.length > 0) {
+        // Ensure delegate is not the booking creator
+        const delegateId = delegationResult.rows[0].delegated_to_id;
+        if (delegateId !== userId) {
+          effectiveApproverId = delegateId;
           delegatedFrom = originalApproverId;
         }
-
-        await pool.query(
-          `INSERT INTO approvals (booking_id, approver_id, status, delegated_from)
-           VALUES ($1, $2, 'pending', $3)`,
-          [booking.id, effectiveApproverId, delegatedFrom]
-        );
       }
+
+      await pool.query(
+        `INSERT INTO approvals (booking_id, approver_id, status, delegated_from)
+         VALUES ($1, $2, 'pending', $3)`,
+        [booking.id, effectiveApproverId, delegatedFrom]
+      );
     }
 
     res.status(201).json({
       success: true,
-      message: 'Booking created successfully',
+      message: initialStatus === 'approved' 
+        ? 'Booking created and auto-approved' 
+        : 'Booking created successfully',
       booking,
       policy_compliant: policyCompliant,
       policy_violations: policyViolations

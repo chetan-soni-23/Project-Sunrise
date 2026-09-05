@@ -18,7 +18,7 @@ const UserManagement = () => {
 
   const [formData, setFormData] = useState({
     name: '', email: '', password: '',
-    role: 'employee', designation: '', salaryBand: 'B', department: ''
+    role: 'employee', designation: '', salaryBand: 'B', department: '', managerId: ''
   });
 
   const [newPassword, setNewPassword] = useState('');
@@ -55,7 +55,7 @@ const UserManagement = () => {
     setEditingUser(null);
     setFormData({
       name: '', email: '', password: '',
-      role: 'employee', designation: '', salaryBand: 'B', department: ''
+      role: 'employee', designation: '', salaryBand: 'B', department: '', managerId: ''
     });
     setShowModal(true);
   };
@@ -69,7 +69,8 @@ const UserManagement = () => {
       role: user.role,
       designation: user.designation,
       salaryBand: user.salary_band,
-      department: user.department || ''
+      department: user.department || '',
+      managerId: user.manager_id || ''
     });
     setShowModal(true);
   };
@@ -224,6 +225,7 @@ const UserManagement = () => {
                   <th className="text-left px-4 py-3 text-xs font-medium text-secondary-500 uppercase">Role</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-secondary-500 uppercase">Designation</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-secondary-500 uppercase">Dept</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-secondary-500 uppercase">Manager</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-secondary-500 uppercase">Band</th>
                   <th className="text-right px-4 py-3 text-xs font-medium text-secondary-500 uppercase">Actions</th>
                 </tr>
@@ -250,6 +252,7 @@ const UserManagement = () => {
                     </td>
                     <td className="px-4 py-3 text-sm text-secondary-700">{user.designation}</td>
                     <td className="px-4 py-3 text-sm text-secondary-700">{user.department || '—'}</td>
+                    <td className="px-4 py-3 text-sm text-secondary-700">{user.manager_name || '—'}</td>
                     <td className="px-4 py-3 text-sm text-secondary-700">Band {user.salary_band}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end space-x-1">
@@ -363,6 +366,19 @@ const UserManagement = () => {
                   placeholder="e.g., Engineering, Marketing"
                   className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-secondary-700 mb-1">Manager</label>
+                <select
+                  name="managerId" value={formData.managerId} onChange={handleFormChange}
+                  className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">No Manager (Department Head)</option>
+                  {users.filter(u => u.id !== editingUser?.id).map(u => (
+                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-secondary-500">Leave empty to auto-assign to department approver</p>
               </div>
               <div className="flex items-center space-x-3 pt-2">
                 <button type="submit" disabled={submitting}
