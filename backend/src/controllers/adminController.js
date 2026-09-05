@@ -5,8 +5,12 @@ const pool = require('../config/database');
 const getUsers = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, name, email, role, designation, salary_band, department, created_at, updated_at
-       FROM users ORDER BY created_at DESC`
+      `SELECT u.id, u.name, u.email, u.role, u.designation, u.salary_band, u.department, 
+              u.manager_id, u.created_at, u.updated_at,
+              m.name as manager_name
+       FROM users u
+       LEFT JOIN users m ON u.manager_id = m.id
+       ORDER BY u.created_at DESC`
     );
 
     res.json({
@@ -25,8 +29,12 @@ const getUser = async (req, res) => {
     const { userId } = req.params;
 
     const result = await pool.query(
-      `SELECT id, name, email, role, designation, salary_band, department, created_at, updated_at
-       FROM users WHERE id = $1`,
+      `SELECT u.id, u.name, u.email, u.role, u.designation, u.salary_band, u.department,
+              u.manager_id, u.created_at, u.updated_at,
+              m.name as manager_name
+       FROM users u
+       LEFT JOIN users m ON u.manager_id = m.id
+       WHERE u.id = $1`,
       [userId]
     );
 
@@ -47,7 +55,7 @@ const getUser = async (req, res) => {
 // Create a new user
 const createUser = async (req, res) => {
   try {
-    const { name, email, password, role, designation, salaryBand, department } = req.body;
+    const { name, email, password, role, designation, salaryBand, department, managerId } = req.body;
 
     // Validate required fields
     if (!name || !email || !password || !role || !designation || !salaryBand) {
@@ -60,15 +68,25 @@ const createUser = async (req, res) => {
       return res.status(400).json({ error: 'Email already registered' });
     }
 
+    // Validate manager exists if provided
+    if (managerId) {
+      const managerExists = await pool.query('SELECT id FROM users WHERE id = $1', [managerId]);
+      if (managerExists.rows.length === 0) {
+        return res.status(400).json({ error: 'Manager not found' });
+      }
+      // Prevent self-assignment as manager
+      // (can't check since user doesn't exist yet, but we can validate after insert)
+    }
+
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
     const result = await pool.query(
-      `INSERT INTO users (name, email, password_hash, role, designation, salary_band, department)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, name, email, role, designation, salary_band, department, created_at`,
-      [name, email, passwordHash, role, designation, salaryBand, department || null]
+      `INSERT INTO users (name, email, password_hash, role, designation, salary_band, department, manager_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, name, email, role, designation, salary_band, department, manager_id, created_at`,
+      [name, email, passwordHash, role, designation, salaryBand, department || null, managerId || null]
     );
 
     res.status(201).json({
@@ -86,7 +104,7 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { name, email, role, designation, salaryBand, department } = req.body;
+    const { name, email, role, designation, salaryBand, department, managerId } = req.body;
 
     // Check user exists
     const existing = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
@@ -105,6 +123,25 @@ const updateUser = async (req, res) => {
       }
     }
 
+    // Prevent self-assignment as manager
+    if (managerId && parseInt(managerId) === parseInt(userId)) {
+      return res.status(400).json({ error: 'Cannot assign yourself as your own manager' });
+    }
+
+    // Validate manager exists if provided
+    if (managerId) {
+      const managerExists = await pool.query('SELECT id FROM users WHERE id = $1', [managerId]);
+      if (managerExists.rows.length === 0) {
+        return res.status(400).json({ error: 'Manager not found' });
+      }
+    }
+
+    // Handle manager_id: use provided value, 'none'/empty means remove manager
+    let effectiveManagerId;
+    if (managerId !== undefined && managerId !== null) {
+      effectiveManagerId = (managerId && managerId !== 'none') ? managerId : null;
+    }
+
     const result = await pool.query(
       `UPDATE users 
        SET name = COALESCE($1, name),
@@ -113,10 +150,11 @@ const updateUser = async (req, res) => {
            designation = COALESCE($4, designation),
            salary_band = COALESCE($5, salary_band),
            department = COALESCE($6, department),
+           manager_id = COALESCE($7, manager_id),
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $7
-       RETURNING id, name, email, role, designation, salary_band, department, created_at, updated_at`,
-      [name || null, email || null, role || null, designation || null, salaryBand || null, department || null, userId]
+       WHERE id = $8
+       RETURNING id, name, email, role, designation, salary_band, department, manager_id, created_at, updated_at`,
+      [name || null, email || null, role || null, designation || null, salaryBand || null, department || null, effectiveManagerId, userId]
     );
 
     res.json({

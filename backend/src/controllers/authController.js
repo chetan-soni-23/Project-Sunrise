@@ -32,7 +32,7 @@ const register = async (req, res) => {
     const result = await pool.query(
       `INSERT INTO users (name, email, password_hash, role, designation, salary_band, department) 
        VALUES ($1, $2, $3, $4, $5, $6, $7) 
-       RETURNING id, name, email, role, designation, salary_band, department`,
+       RETURNING id, name, email, role, designation, salary_band, department, manager_id`,
       [name, email, passwordHash, role, designation, salaryBand, department]
     );
 
@@ -93,7 +93,7 @@ const login = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, email, role, designation, salary_band, department, created_at FROM users WHERE id = $1',
+      'SELECT id, name, email, role, designation, salary_band, department, manager_id, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
 

@@ -57,6 +57,33 @@ const seedData = async () => {
       );
     }
 
+    // Set up manager relationships (employees -> their department approvers)
+    // John (Engineering employee) -> Jane (Engineering Manager)
+    await client.query(
+      `UPDATE users SET manager_id = (SELECT id FROM users WHERE email = 'approver@test.com')
+       WHERE email = 'employee@test.com' AND manager_id IS NULL`
+    );
+    // Priya (Engineering employee) -> Vikram (Engineering Senior Manager)
+    await client.query(
+      `UPDATE users SET manager_id = (SELECT id FROM users WHERE email = 'vikram@test.com')
+       WHERE email = 'priya@test.com' AND manager_id IS NULL`
+    );
+    // Amit (Finance employee) -> Neha (Finance Director)
+    await client.query(
+      `UPDATE users SET manager_id = (SELECT id FROM users WHERE email = 'neha@test.com')
+       WHERE email = 'amit@test.com' AND manager_id IS NULL`
+    );
+    // Vikram (Senior Manager) -> Raj (VP)
+    await client.query(
+      `UPDATE users SET manager_id = (SELECT id FROM users WHERE email = 'raj@test.com')
+       WHERE email = 'vikram@test.com' AND manager_id IS NULL`
+    );
+    // Jane (Manager) -> Vikram (Senior Manager)
+    await client.query(
+      `UPDATE users SET manager_id = (SELECT id FROM users WHERE email = 'vikram@test.com')
+       WHERE email = 'approver@test.com' AND manager_id IS NULL`
+    );
+
     await client.query('COMMIT');
     console.log('Database seeded successfully!');
     console.log('\nTest Users:');

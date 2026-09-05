@@ -109,6 +109,14 @@ const createTables = async () => {
       END $$;
     `);
 
+    // Add manager_id column to users table if not exists
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE users ADD COLUMN manager_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$;
+    `);
+
     // Search history table
     await client.query(`
       CREATE TABLE IF NOT EXISTS search_history (
@@ -136,6 +144,8 @@ const createTables = async () => {
         WHERE is_active = true;
       CREATE UNIQUE INDEX IF NOT EXISTS uq_approvals_booking_approver
         ON approvals(booking_id, approver_id);
+      CREATE INDEX IF NOT EXISTS idx_users_manager_id ON users(manager_id);
+      CREATE INDEX IF NOT EXISTS idx_users_department ON users(department);
     `);
 
     await client.query('COMMIT');
