@@ -187,63 +187,76 @@ const createBooking = async (req, res) => {
       console.warn(`Approval required but no approver found for user ${userId} — auto-approving booking`);
     }
 
-    // Create booking
-    const result = await pool.query(
-      `INSERT INTO bookings (
-        user_id, booking_type, status, travel_date, return_date,
-        from_city, to_city, hotel_name, hotel_city, check_in, check_out,
-        flight_class, hotel_stars, total_cost, policy_compliant, policy_violations, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-       RETURNING *`,
-      [
-        userId, bookingType, initialStatus, travelDate, returnDate,
-        fromCity, toCity, hotelName, hotelCity, checkIn, checkOut,
-        flightClass, hotelStars, totalCost, policyCompliant, policyViolations, notes
-      ]
-    );
+    // Create booking + approval atomically
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    const booking = result.rows[0];
-
-    // Create approval request only if we have an approver and approval is required
-    if (requiresApprovalFlow && originalApproverId) {
-      let effectiveApproverId = originalApproverId;
-      let delegatedFrom = null;
-
-      // Check for active delegation
-      const delegationResult = await pool.query(
-        `SELECT delegated_to_id FROM approval_delegations 
-         WHERE original_approver_id = $1 
-           AND is_active = true
-           AND (start_date IS NULL OR start_date <= CURRENT_DATE)
-           AND (end_date IS NULL OR end_date >= CURRENT_DATE)`,
-        [originalApproverId]
+      // Create booking
+      const result = await client.query(
+        `INSERT INTO bookings (
+          user_id, booking_type, status, travel_date, return_date,
+          from_city, to_city, hotel_name, hotel_city, check_in, check_out,
+          flight_class, hotel_stars, total_cost, policy_compliant, policy_violations, notes
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         RETURNING *`,
+        [
+          userId, bookingType, initialStatus, travelDate, returnDate,
+          fromCity, toCity, hotelName, hotelCity, checkIn, checkOut,
+          flightClass, hotelStars, totalCost, policyCompliant, policyViolations, notes
+        ]
       );
 
-      if (delegationResult.rows.length > 0) {
-        // Ensure delegate is not the booking creator
-        const delegateId = delegationResult.rows[0].delegated_to_id;
-        if (delegateId !== userId) {
-          effectiveApproverId = delegateId;
-          delegatedFrom = originalApproverId;
+      const booking = result.rows[0];
+
+      // Create approval request only if we have an approver and approval is required
+      if (requiresApprovalFlow && originalApproverId) {
+        let effectiveApproverId = originalApproverId;
+        let delegatedFrom = null;
+
+        // Check for active delegation
+        const delegationResult = await client.query(
+          `SELECT delegated_to_id FROM approval_delegations 
+           WHERE original_approver_id = $1 
+             AND is_active = true
+             AND (start_date IS NULL OR start_date <= CURRENT_DATE)
+             AND (end_date IS NULL OR end_date >= CURRENT_DATE)`,
+          [originalApproverId]
+        );
+
+        if (delegationResult.rows.length > 0) {
+          // Ensure delegate is not the booking creator
+          const delegateId = delegationResult.rows[0].delegated_to_id;
+          if (delegateId !== userId) {
+            effectiveApproverId = delegateId;
+            delegatedFrom = originalApproverId;
+          }
         }
+
+        await client.query(
+          `INSERT INTO approvals (booking_id, approver_id, status, delegated_from)
+           VALUES ($1, $2, 'pending', $3)`,
+          [booking.id, effectiveApproverId, delegatedFrom]
+        );
       }
 
-      await pool.query(
-        `INSERT INTO approvals (booking_id, approver_id, status, delegated_from)
-         VALUES ($1, $2, 'pending', $3)`,
-        [booking.id, effectiveApproverId, delegatedFrom]
-      );
-    }
+      await client.query('COMMIT');
 
-    res.status(201).json({
-      success: true,
-      message: initialStatus === 'approved' 
-        ? 'Booking created and auto-approved' 
-        : 'Booking created successfully',
-      booking,
-      policy_compliant: policyCompliant,
-      policy_violations: policyViolations
-    });
+      res.status(201).json({
+        success: true,
+        message: initialStatus === 'approved' 
+          ? 'Booking created and auto-approved' 
+          : 'Booking created successfully',
+        booking,
+        policy_compliant: policyCompliant,
+        policy_violations: policyViolations
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     // Handle unique constraint violation (duplicate approval for same booking+approver)
     if (error.code === '23505') {
@@ -362,24 +375,37 @@ const updateApproval = async (req, res) => {
 
     const bookingId = approvalResult.rows[0].booking_id;
 
-    // Update approval status
-    await pool.query(
-      'UPDATE approvals SET status = $1, comments = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [status, comments, approvalId]
-    );
+    // Update approval and booking status atomically
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    // Update booking status
-    await pool.query(
-      'UPDATE bookings SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [status, bookingId]
-    );
+      // Update approval status
+      await client.query(
+        'UPDATE approvals SET status = $1, comments = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+        [status, comments, approvalId]
+      );
 
-    res.json({
-      success: true,
-      message: `Booking ${status} successfully`,
-      booking_id: bookingId,
-      status
-    });
+      // Update booking status
+      await client.query(
+        'UPDATE bookings SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [status, bookingId]
+      );
+
+      await client.query('COMMIT');
+
+      res.json({
+        success: true,
+        message: `Booking ${status} successfully`,
+        booking_id: bookingId,
+        status
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error('Update approval error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -403,22 +429,35 @@ const cancelBooking = async (req, res) => {
       return res.status(404).json({ error: 'Booking not found or cannot be cancelled' });
     }
 
-    // Update booking status
-    await pool.query(
-      "UPDATE bookings SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
-      [bookingId]
-    );
+    // Cancel booking and approvals atomically
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    // Also cancel any pending approvals for this booking
-    await pool.query(
-      "UPDATE approvals SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE booking_id = $1 AND status = 'pending'",
-      [bookingId]
-    );
+      // Update booking status
+      await client.query(
+        "UPDATE bookings SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+        [bookingId]
+      );
 
-    res.json({
-      success: true,
-      message: 'Booking cancelled successfully'
-    });
+      // Also cancel any pending approvals for this booking
+      await client.query(
+        "UPDATE approvals SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE booking_id = $1 AND status = 'pending'",
+        [bookingId]
+      );
+
+      await client.query('COMMIT');
+
+      res.json({
+        success: true,
+        message: 'Booking cancelled successfully'
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error('Cancel booking error:', error);
     res.status(500).json({ error: 'Internal server error' });
