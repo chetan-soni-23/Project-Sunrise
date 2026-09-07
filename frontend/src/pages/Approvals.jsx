@@ -202,6 +202,12 @@ const Approvals = () => {
                       <li key={index}>{violation}</li>
                     ))}
                   </ul>
+                  {approval.justification && (
+                    <div className="mt-2">
+                      <p className="text-sm text-blue-800 font-medium">Employee Justification:</p>
+                      <p className="text-sm text-blue-600 italic">"{approval.justification}"</p>
+                    </div>
+                  )}
                 </div>
               )}
 

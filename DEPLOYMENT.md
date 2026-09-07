@@ -174,9 +174,9 @@ curl https://your-app.up.railway.app/api/health
 1. Open `https://your-app.vercel.app` in your browser
 2. You should see the login page
 3. Test with these credentials:
-   - **Employee**: `employee@test.com` / `password123`
-   - **Approver**: `approver@test.com` / `password123`
-   - **Admin**: `admin@test.com` / `password123`
+   - **Employee**: `karan.kapoor@company.com` / `password123`
+   - **Approver**: `aditya.roy@company.com` / `password123`
+   - **Admin**: `arjun.mehta@company.com` / `password123`
 
 ---
 

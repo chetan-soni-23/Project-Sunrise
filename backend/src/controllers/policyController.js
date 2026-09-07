@@ -93,6 +93,20 @@ const validateBooking = async (req, res) => {
       }
     }
 
+    // Check cost limits
+    if (totalCost) {
+      if (bookingType === 'flight' && policy.max_flight_cost) {
+        if (parseFloat(totalCost) > parseFloat(policy.max_flight_cost)) {
+          violations.push(`Flight cost ₹${totalCost} exceeds maximum allowed ₹${policy.max_flight_cost}`);
+        }
+      }
+      if (bookingType === 'hotel' && policy.max_hotel_cost_per_night) {
+        if (parseFloat(totalCost) > parseFloat(policy.max_hotel_cost_per_night)) {
+          violations.push(`Hotel cost ₹${totalCost}/night exceeds maximum allowed ₹${policy.max_hotel_cost_per_night}`);
+        }
+      }
+    }
+
     const isCompliant = violations.length === 0;
 
     res.json({
@@ -103,6 +117,10 @@ const validateBooking = async (req, res) => {
         designation: policy.designation,
         max_flight_class: policy.max_flight_class,
         max_hotel_stars: policy.max_hotel_stars,
+        salary_min_lakhs: policy.salary_min_lakhs,
+        salary_max_lakhs: policy.salary_max_lakhs,
+        max_hotel_cost_per_night: policy.max_hotel_cost_per_night,
+        max_flight_cost: policy.max_flight_cost,
         requires_approval: policy.requires_approval
       }
     });
@@ -115,18 +133,23 @@ const validateBooking = async (req, res) => {
 // Create/Update policy (admin only)
 const upsertPolicy = async (req, res) => {
   try {
-    const { designation, maxFlightClass, maxHotelStars, requiresApproval } = req.body;
+    const { designation, maxFlightClass, maxHotelStars, salaryMinLakhs, salaryMaxLakhs, maxHotelCostPerNight, maxFlightCost, requiresApproval } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO travel_policies (designation, max_flight_class, max_hotel_stars, requires_approval)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO travel_policies (designation, max_flight_class, max_hotel_stars, salary_min_lakhs, salary_max_lakhs, max_hotel_cost_per_night, max_flight_cost, requires_approval)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (designation) 
        DO UPDATE SET 
          max_flight_class = EXCLUDED.max_flight_class,
          max_hotel_stars = EXCLUDED.max_hotel_stars,
-         requires_approval = EXCLUDED.requires_approval
+         salary_min_lakhs = EXCLUDED.salary_min_lakhs,
+         salary_max_lakhs = EXCLUDED.salary_max_lakhs,
+         max_hotel_cost_per_night = EXCLUDED.max_hotel_cost_per_night,
+         max_flight_cost = EXCLUDED.max_flight_cost,
+         requires_approval = EXCLUDED.requires_approval,
+         updated_at = CURRENT_TIMESTAMP
        RETURNING *`,
-      [designation, maxFlightClass, maxHotelStars, requiresApproval]
+      [designation, maxFlightClass, maxHotelStars, salaryMinLakhs || null, salaryMaxLakhs || null, maxHotelCostPerNight || null, maxFlightCost || null, requiresApproval]
     );
 
     res.json({

@@ -2,13 +2,18 @@ import React, { useState } from 'react';
 import { X, ChevronLeft, ChevronRight, MapPin, Star, Calendar, Users, BookOpen } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const PLACEHOLDER = 'https://via.placeholder.com/600x400?text=No+Image';
 const THUMB_PLACEHOLDER = 'https://via.placeholder.com/60x40?text=N/A';
 
 const HotelDetailModal = ({ hotel, checkIn, checkOut, guests, onClose }) => {
+  const { user } = useAuth();
   const [currentImage, setCurrentImage] = useState(0);
   const [booking, setBooking] = useState(false);
+  const [showJustificationModal, setShowJustificationModal] = useState(false);
+  const [justificationText, setJustificationText] = useState('');
+  const [policyViolations, setPolicyViolations] = useState([]);
 
   if (!hotel) return null;
 
@@ -37,7 +42,7 @@ const HotelDetailModal = ({ hotel, checkIn, checkOut, guests, onClose }) => {
   const handleBook = async () => {
     setBooking(true);
     try {
-      await api.post('/bookings', {
+      const bookingData = {
         bookingType: 'hotel',
         travelDate: checkIn || new Date().toISOString().split('T')[0],
         returnDate: checkOut,
@@ -48,7 +53,26 @@ const HotelDetailModal = ({ hotel, checkIn, checkOut, guests, onClose }) => {
         hotelStars: hotel.stars,
         totalCost: hotel.total_price || hotel.price_per_night,
         notes: `Hotel: ${hotel.name}`,
+      };
+
+      // First validate against policy
+      const validateResponse = await api.post('/policies/validate', {
+        userId: user.id,
+        bookingType: 'hotel',
+        hotelStars: hotel.stars,
+        totalCost: hotel.total_price || hotel.price_per_night
       });
+
+      if (!validateResponse.data.compliant) {
+        // Show justification modal
+        setPolicyViolations(validateResponse.data.violations);
+        setShowJustificationModal(true);
+        setBooking(false);
+        return;
+      }
+
+      // Policy compliant, proceed with booking
+      await api.post('/bookings', bookingData);
       toast.success('Booking request submitted!');
       onClose();
     } catch (error) {
@@ -56,6 +80,43 @@ const HotelDetailModal = ({ hotel, checkIn, checkOut, guests, onClose }) => {
     } finally {
       setBooking(false);
     }
+  };
+
+  const handleJustificationSubmit = async () => {
+    if (!justificationText.trim()) {
+      toast.error('Please provide a justification');
+      return;
+    }
+
+    try {
+      const bookingData = {
+        bookingType: 'hotel',
+        travelDate: checkIn || new Date().toISOString().split('T')[0],
+        returnDate: checkOut,
+        hotelName: hotel.name,
+        hotelCity: hotel.city,
+        checkIn,
+        checkOut,
+        hotelStars: hotel.stars,
+        totalCost: hotel.total_price || hotel.price_per_night,
+        notes: `Hotel: ${hotel.name}`,
+        justification: justificationText
+      };
+
+      await api.post('/bookings', bookingData);
+      toast.success('Booking with justification submitted!');
+      setShowJustificationModal(false);
+      setJustificationText('');
+      onClose();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to create booking');
+    }
+  };
+
+  const handleJustificationCancel = () => {
+    setShowJustificationModal(false);
+    setJustificationText('');
+    toast.info('Booking cancelled');
   };
 
   return (
@@ -240,6 +301,47 @@ const HotelDetailModal = ({ hotel, checkIn, checkOut, guests, onClose }) => {
           </div>
         </div>
       </div>
+
+      {/* Justification Modal */}
+      {showJustificationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-semibold text-red-600 mb-4">⚠️ Policy Violation</h3>
+            <p className="text-secondary-600 mb-4">
+              Your booking violates the following policies:
+            </p>
+            <ul className="list-disc list-inside text-sm text-red-600 mb-4 space-y-1">
+              {policyViolations.map((violation, index) => (
+                <li key={index}>{violation}</li>
+              ))}
+            </ul>
+            <p className="text-secondary-600 mb-4">
+              Please provide a justification for this out-of-policy booking, or cancel.
+            </p>
+            <textarea
+              value={justificationText}
+              onChange={(e) => setJustificationText(e.target.value)}
+              className="w-full border border-secondary-300 rounded-lg p-3 mb-4 resize-none"
+              rows={4}
+              placeholder="Enter justification for this out-of-policy booking..."
+            />
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={handleJustificationCancel}
+                className="px-4 py-2 text-secondary-600 hover:text-secondary-800"
+              >
+                Cancel Booking
+              </button>
+              <button
+                onClick={handleJustificationSubmit}
+                className="btn-primary"
+              >
+                Submit with Justification
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

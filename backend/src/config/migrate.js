@@ -22,6 +22,14 @@ const createTables = async () => {
       );
     `);
 
+    // Add justification column to bookings table if not exists
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE bookings ADD COLUMN justification TEXT;
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$;
+    `);
+
     // Travel policies table
     await client.query(`
       CREATE TABLE IF NOT EXISTS travel_policies (
@@ -29,8 +37,13 @@ const createTables = async () => {
         designation VARCHAR(50) NOT NULL,
         max_flight_class VARCHAR(20) NOT NULL DEFAULT 'economy',
         max_hotel_stars INTEGER NOT NULL DEFAULT 3,
+        salary_min_lakhs DECIMAL(10,2),
+        salary_max_lakhs DECIMAL(10,2),
+        max_hotel_cost_per_night DECIMAL(10,2),
+        max_flight_cost DECIMAL(10,2),
         requires_approval BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE (designation)
       );
     `);

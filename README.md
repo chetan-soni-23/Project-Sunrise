@@ -107,9 +107,9 @@ After running the seed script, you can login with:
 
 | Role | Email | Password |
 |------|-------|----------|
-| Employee | employee@test.com | password123 |
-| Approver | approver@test.com | password123 |
-| Admin | admin@test.com | password123 |
+| Employee | karan.kapoor@company.com | password123 |
+| Approver | aditya.roy@company.com | password123 |
+| Admin | arjun.mehta@company.com | password123 |
 
 ## 📁 Project Structure
 

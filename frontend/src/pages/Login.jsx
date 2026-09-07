@@ -95,9 +95,9 @@ const Login = () => {
         <div className="mt-6 p-4 bg-secondary-100 rounded-lg">
           <p className="text-sm text-secondary-600 font-medium mb-2">Test Accounts:</p>
           <div className="text-xs text-secondary-500 space-y-1">
-            <p><strong>Employee:</strong> employee@test.com / password123</p>
-            <p><strong>Approver:</strong> approver@test.com / password123</p>
-            <p><strong>Admin:</strong> admin@test.com / password123</p>
+            <p><strong>Employee:</strong> karan.kapoor@company.com / password123</p>
+            <p><strong>Approver:</strong> aditya.roy@company.com / password123</p>
+            <p><strong>Admin:</strong> arjun.mehta@company.com / password123</p>
           </div>
         </div>
       </div>

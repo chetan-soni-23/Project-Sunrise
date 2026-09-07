@@ -160,6 +160,12 @@ const MyBookings = () => {
                       <li key={index}>{violation}</li>
                     ))}
                   </ul>
+                  {booking.justification && (
+                    <div className="mt-2">
+                      <p className="text-sm text-blue-800 font-medium">Your Justification:</p>
+                      <p className="text-sm text-blue-600 italic">{booking.justification}</p>
+                    </div>
+                  )}
                 </div>
               )}
 

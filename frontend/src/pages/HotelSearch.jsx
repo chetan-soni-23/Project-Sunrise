@@ -19,10 +19,25 @@ const HotelSearch = () => {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [selectedHotel, setSelectedHotel] = useState(null);
+  const [showJustificationModal, setShowJustificationModal] = useState(false);
+  const [justificationText, setJustificationText] = useState('');
+  const [pendingBooking, setPendingBooking] = useState(null);
+  const [policyViolations, setPolicyViolations] = useState([]);
+  const [userPolicy, setUserPolicy] = useState(null);
 
   useEffect(() => {
     fetchCities();
+    fetchUserPolicy();
   }, []);
+
+  const fetchUserPolicy = async () => {
+    try {
+      const response = await api.get(`/policies/${encodeURIComponent(user.designation)}`);
+      setUserPolicy(response.data.policy);
+    } catch (error) {
+      console.error('Failed to fetch policy:', error);
+    }
+  };
 
   const fetchCities = async () => {
     try {
@@ -71,12 +86,61 @@ const HotelSearch = () => {
         notes: `Hotel: ${hotel.name}`
       };
 
+      // First validate against policy
+      const validateResponse = await api.post('/policies/validate', {
+        userId: user.id,
+        bookingType: 'hotel',
+        hotelStars: hotel.stars,
+        totalCost: hotel.total_price || hotel.price_per_night
+      });
+
+      if (!validateResponse.data.compliant) {
+        // Show justification modal
+        setPolicyViolations(validateResponse.data.violations);
+        setPendingBooking(bookingData);
+        setShowJustificationModal(true);
+        return;
+      }
+
+      // Policy compliant, proceed with booking
       await api.post('/bookings', bookingData);
       toast.success('Booking request submitted!');
     } catch (error) {
       console.error('Booking failed:', error);
       toast.error(error.response?.data?.error || 'Failed to create booking');
     }
+  };
+
+  const handleJustificationSubmit = async () => {
+    if (!justificationText.trim()) {
+      toast.error('Please provide a justification');
+      return;
+    }
+
+    try {
+      const bookingData = {
+        ...pendingBooking,
+        justification: justificationText
+      };
+
+      await api.post('/bookings', bookingData);
+      toast.success('Booking with justification submitted!');
+      setShowJustificationModal(false);
+      setJustificationText('');
+      setPendingBooking(null);
+      setPolicyViolations([]);
+    } catch (error) {
+      console.error('Booking failed:', error);
+      toast.error(error.response?.data?.error || 'Failed to create booking');
+    }
+  };
+
+  const handleJustificationCancel = () => {
+    setShowJustificationModal(false);
+    setJustificationText('');
+    setPendingBooking(null);
+    setPolicyViolations([]);
+    toast.info('Booking cancelled');
   };
 
   const renderStars = (count) => {
@@ -193,14 +257,13 @@ const HotelSearch = () => {
         <p className="text-sm text-primary-800">
           <strong>Your Policy:</strong> As a {user.designation}, you are entitled to stay at{' '}
           <span className="font-semibold">{
-            user.designation === 'VP' || user.designation === 'SVP' || user.designation === 'Director'
-              ? '5-Star Hotels'
-              : user.designation === 'Senior Manager' || user.designation === 'Manager'
-              ? '4-Star Hotels'
-              : user.designation === 'Senior Executive'
-              ? '3-Star Hotels'
-              : '2-Star Hotels'
+            userPolicy?.max_hotel_stars
+              ? `${userPolicy.max_hotel_stars}-Star Hotels`
+              : '...'
           }</span>.
+          {userPolicy?.max_hotel_cost_per_night && (
+            <> Max cost: <span className="font-semibold">₹{userPolicy.max_hotel_cost_per_night.toLocaleString()}/night</span></>
+          )}
         </p>
       </div>
 
@@ -334,6 +397,47 @@ const HotelSearch = () => {
           guests={searchParams.guests}
           onClose={closeModal}
         />
+      )}
+
+      {/* Justification Modal */}
+      {showJustificationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-semibold text-red-600 mb-4">⚠️ Policy Violation</h3>
+            <p className="text-secondary-600 mb-4">
+              Your booking violates the following policies:
+            </p>
+            <ul className="list-disc list-inside text-sm text-red-600 mb-4 space-y-1">
+              {policyViolations.map((violation, index) => (
+                <li key={index}>{violation}</li>
+              ))}
+            </ul>
+            <p className="text-secondary-600 mb-4">
+              Please provide a justification for this out-of-policy booking, or cancel.
+            </p>
+            <textarea
+              value={justificationText}
+              onChange={(e) => setJustificationText(e.target.value)}
+              className="w-full border border-secondary-300 rounded-lg p-3 mb-4 resize-none"
+              rows={4}
+              placeholder="Enter justification for this out-of-policy booking..."
+            />
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={handleJustificationCancel}
+                className="px-4 py-2 text-secondary-600 hover:text-secondary-800"
+              >
+                Cancel Booking
+              </button>
+              <button
+                onClick={handleJustificationSubmit}
+                className="btn-primary"
+              >
+                Submit with Justification
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

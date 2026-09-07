@@ -17,6 +17,10 @@ const PolicyManagement = () => {
     designation: '',
     maxFlightClass: 'economy',
     maxHotelStars: 3,
+    salaryMinLakhs: '',
+    salaryMaxLakhs: '',
+    maxHotelCostPerNight: '',
+    maxFlightCost: '',
     requiresApproval: true
   });
 
@@ -47,6 +51,10 @@ const PolicyManagement = () => {
       designation: '',
       maxFlightClass: 'economy',
       maxHotelStars: 3,
+      salaryMinLakhs: '',
+      salaryMaxLakhs: '',
+      maxHotelCostPerNight: '',
+      maxFlightCost: '',
       requiresApproval: true
     });
     setShowModal(true);
@@ -58,6 +66,10 @@ const PolicyManagement = () => {
       designation: policy.designation,
       maxFlightClass: policy.max_flight_class,
       maxHotelStars: policy.max_hotel_stars,
+      salaryMinLakhs: policy.salary_min_lakhs || '',
+      salaryMaxLakhs: policy.salary_max_lakhs || '',
+      maxHotelCostPerNight: policy.max_hotel_cost_per_night || '',
+      maxFlightCost: policy.max_flight_cost || '',
       requiresApproval: policy.requires_approval
     });
     setShowModal(true);
@@ -175,6 +187,9 @@ const PolicyManagement = () => {
                   <th className="text-left px-4 py-3 text-xs font-medium text-secondary-500 uppercase">Designation</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-secondary-500 uppercase">Max Flight Class</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-secondary-500 uppercase">Max Hotel Stars</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-secondary-500 uppercase">Salary Range (₹L)</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-secondary-500 uppercase">Max Hotel/Night</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-secondary-500 uppercase">Max Flight</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-secondary-500 uppercase">Requires Approval</th>
                   <th className="text-right px-4 py-3 text-xs font-medium text-secondary-500 uppercase">Actions</th>
                 </tr>
@@ -200,6 +215,18 @@ const PolicyManagement = () => {
                           />
                         ))}
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-secondary-700">
+                      {policy.salary_min_lakhs && policy.salary_max_lakhs
+                        ? `₹${policy.salary_min_lakhs}L – ₹${policy.salary_max_lakhs}L`
+                        : '—'
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-sm text-secondary-700">
+                      {policy.max_hotel_cost_per_night ? `₹${policy.max_hotel_cost_per_night}` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-secondary-700">
+                      {policy.max_flight_cost ? `₹${policy.max_flight_cost}` : '—'}
                     </td>
                     <td className="px-4 py-3">
                       {policy.requires_approval ? (
@@ -309,6 +336,64 @@ const PolicyManagement = () => {
                     <option key={s} value={s}>{s} Star{s > 1 ? 's' : ''}</option>
                   ))}
                 </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">Salary Min (₹ Lakhs)</label>
+                  <input
+                    type="number"
+                    name="salaryMinLakhs"
+                    value={formData.salaryMinLakhs}
+                    onChange={handleFormChange}
+                    placeholder="e.g. 2"
+                    min="0"
+                    step="0.5"
+                    className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">Salary Max (₹ Lakhs)</label>
+                  <input
+                    type="number"
+                    name="salaryMaxLakhs"
+                    value={formData.salaryMaxLakhs}
+                    onChange={handleFormChange}
+                    placeholder="e.g. 4"
+                    min="0"
+                    step="0.5"
+                    className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">Max Hotel Cost/Night (₹)</label>
+                  <input
+                    type="number"
+                    name="maxHotelCostPerNight"
+                    value={formData.maxHotelCostPerNight}
+                    onChange={handleFormChange}
+                    placeholder="e.g. 4000"
+                    min="0"
+                    step="100"
+                    className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">Max Flight Cost (₹)</label>
+                  <input
+                    type="number"
+                    name="maxFlightCost"
+                    value={formData.maxFlightCost}
+                    onChange={handleFormChange}
+                    placeholder="e.g. 12000"
+                    min="0"
+                    step="100"
+                    className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center space-x-3">

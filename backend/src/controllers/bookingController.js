@@ -17,7 +17,8 @@ const createBooking = async (req, res) => {
       flightClass,
       hotelStars,
       totalCost,
-      notes
+      notes,
+      justification
     } = req.body;
 
     // Validate booking type
@@ -33,7 +34,7 @@ const createBooking = async (req, res) => {
 
     const userDesignation = userResult.rows[0]?.designation;
 
-    // Get policy violations
+    // Get designation-based policy
     const policyResult = await pool.query(
       'SELECT * FROM travel_policies WHERE designation = $1',
       [userDesignation]
@@ -66,6 +67,22 @@ const createBooking = async (req, res) => {
         if (hotelStars > policy.max_hotel_stars) {
           policyViolations.push(`Hotel with ${hotelStars} stars exceeds max ${policy.max_hotel_stars} stars`);
           policyCompliant = false;
+        }
+      }
+
+      // Check cost limits
+      if (totalCost) {
+        if (bookingType === 'flight' && policy.max_flight_cost) {
+          if (parseFloat(totalCost) > parseFloat(policy.max_flight_cost)) {
+            policyViolations.push(`Flight cost ₹${totalCost} exceeds maximum allowed ₹${policy.max_flight_cost}`);
+            policyCompliant = false;
+          }
+        }
+        if (bookingType === 'hotel' && policy.max_hotel_cost_per_night) {
+          if (parseFloat(totalCost) > parseFloat(policy.max_hotel_cost_per_night)) {
+            policyViolations.push(`Hotel cost ₹${totalCost}/night exceeds maximum allowed ₹${policy.max_hotel_cost_per_night}`);
+            policyCompliant = false;
+          }
         }
       }
     }
@@ -176,6 +193,15 @@ const createBooking = async (req, res) => {
       }
     }
 
+    // If policy violations exist, require justification
+    if (!policyCompliant && (!justification || justification.trim() === '')) {
+      return res.status(400).json({
+        error: 'Justification required for out-of-policy booking',
+        policy_violations: policyViolations,
+        requires_justification: true
+      });
+    }
+
     // Determine initial booking status:
     // - 'approved' if no approval required by policy
     // - 'approved' if approval required but no approver could be found (prevent zombie bookings)
@@ -197,13 +223,13 @@ const createBooking = async (req, res) => {
         `INSERT INTO bookings (
           user_id, booking_type, status, travel_date, return_date,
           from_city, to_city, hotel_name, hotel_city, check_in, check_out,
-          flight_class, hotel_stars, total_cost, policy_compliant, policy_violations, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+          flight_class, hotel_stars, total_cost, policy_compliant, policy_violations, notes, justification
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
          RETURNING *`,
         [
           userId, bookingType, initialStatus, travelDate, returnDate,
           fromCity, toCity, hotelName, hotelCity, checkIn, checkOut,
-          flightClass, hotelStars, totalCost, policyCompliant, policyViolations, notes
+          flightClass, hotelStars, totalCost, policyCompliant, policyViolations, notes, justification || null
         ]
       );
 
@@ -249,7 +275,8 @@ const createBooking = async (req, res) => {
           : 'Booking created successfully',
         booking,
         policy_compliant: policyCompliant,
-        policy_violations: policyViolations
+        policy_violations: policyViolations,
+        justification: justification || null
       });
     } catch (error) {
       await client.query('ROLLBACK');
