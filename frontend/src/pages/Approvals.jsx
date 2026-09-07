@@ -211,6 +211,18 @@ const Approvals = () => {
                 </div>
               )}
 
+              {/* Fulfillment Status */}
+              {approval.confirmation_number && (
+                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-800">
+                    <strong>✓ Ticketed:</strong> Confirmation #{approval.confirmation_number}
+                    {approval.email_sent_at && (
+                      <> — E-ticket emailed on {new Date(approval.email_sent_at).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}</>
+                    )}
+                  </p>
+                </div>
+              )}
+
               {/* Actions — only show for pending approvals */}
               {approval.approval_status === 'pending' && (
                 <div className="mt-4 pt-4 border-t border-secondary-200 flex items-center space-x-4">

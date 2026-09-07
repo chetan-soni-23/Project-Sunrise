@@ -30,6 +30,32 @@ const createTables = async () => {
       END $$;
     `);
 
+    // Add fulfillment columns to bookings table
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE bookings ADD COLUMN confirmation_number VARCHAR(20);
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$;
+    `);
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE bookings ADD COLUMN ticket_pdf_path VARCHAR(255);
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$;
+    `);
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE bookings ADD COLUMN ticket_generated_at TIMESTAMP;
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$;
+    `);
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE bookings ADD COLUMN email_sent_at TIMESTAMP;
+      EXCEPTION WHEN duplicate_column THEN NULL;
+      END $$;
+    `);
+
     // Travel policies table
     await client.query(`
       CREATE TABLE IF NOT EXISTS travel_policies (

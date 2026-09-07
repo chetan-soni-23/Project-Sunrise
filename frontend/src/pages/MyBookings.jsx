@@ -1,7 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Calendar, Plane, Building2, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Calendar, Plane, Building2, Clock, CheckCircle, XCircle, AlertCircle, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+const downloadTicket = async (bookingId, bookingType, confirmationNumber) => {
+  try {
+    const response = await api.get(`/bookings/${bookingId}/ticket`, { responseType: 'blob' });
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = bookingType === 'flight'
+      ? `e-ticket-${confirmationNumber || bookingId}.pdf`
+      : `confirmation-${confirmationNumber || bookingId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    toast.success('E-ticket downloaded!');
+  } catch (error) {
+    toast.error(error.response?.data?.error || 'Failed to download e-ticket');
+  }
+};
 
 const MyBookings = () => {
   const [bookings, setBookings] = useState([]);
@@ -151,6 +170,23 @@ const MyBookings = () => {
                 </div>
               </div>
 
+              {/* Confirmation Number */}
+              {booking.confirmation_number && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-blue-800 font-medium">Confirmation Number</p>
+                    <p className="text-lg font-bold text-blue-600">{booking.confirmation_number}</p>
+                  </div>
+                  <button
+                    onClick={() => downloadTicket(booking.id, booking.booking_type, booking.confirmation_number)}
+                    className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Download E-Ticket</span>
+                  </button>
+                </div>
+              )}
+
               {/* Policy Compliance */}
               {booking.policy_compliant === false && (
                 <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -175,6 +211,16 @@ const MyBookings = () => {
                   <p className="text-sm text-secondary-600">
                     <strong>Approval Status:</strong> {booking.approval_status}
                     {booking.approval_comments && ` - "${booking.approval_comments}"`}
+                  </p>
+                </div>
+              )}
+
+              {/* Fulfillment Status */}
+              {booking.status === 'ticketed' && (
+                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-800">
+                    <strong>✓ Ticketed & Emailed:</strong> E-ticket sent to your email on{' '}
+                    {booking.email_sent_at && new Date(booking.email_sent_at).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}
                   </p>
                 </div>
               )}

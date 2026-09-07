@@ -1,4 +1,6 @@
 const pool = require('../config/database');
+const { generateConfirmationNumber, generateFlightTicket, generateHotelTicket } = require('../services/ticketService');
+const { sendApprovalEmail, sendRejectionEmail } = require('../services/emailService');
 
 // Create new booking
 const createBooking = async (req, res) => {
@@ -420,19 +422,114 @@ const updateApproval = async (req, res) => {
       );
 
       await client.query('COMMIT');
-
-      res.json({
-        success: true,
-        message: `Booking ${status} successfully`,
-        booking_id: bookingId,
-        status
-      });
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
     } finally {
       client.release();
     }
+
+    // --- Post-approval fulfillment (runs after transaction commits) ---
+    if (status === 'approved') {
+      try {
+        // Fetch full booking + user + policy data
+        const bookingResult = await pool.query(
+          `SELECT b.*, u.name, u.email, u.designation, u.department, u.id as user_id
+           FROM bookings b
+           JOIN users u ON b.user_id = u.id
+           WHERE b.id = $1`,
+          [bookingId]
+        );
+        const booking = bookingResult.rows[0];
+
+        const policyResult = await pool.query(
+          'SELECT * FROM travel_policies WHERE designation = $1',
+          [booking.designation]
+        );
+        const policy = policyResult.rows[0] || {};
+
+        const user = {
+          id: booking.user_id,
+          name: booking.name,
+          email: booking.email,
+          designation: booking.designation,
+          department: booking.department,
+        };
+
+        // 1. Generate confirmation number
+        const confirmationNumber = generateConfirmationNumber();
+
+        // 2. Generate PDF ticket
+        let ticketPath = null;
+        let ticketFilename = null;
+        if (booking.booking_type === 'flight') {
+          const result = await generateFlightTicket(booking, user, policy);
+          ticketPath = result.filepath;
+          ticketFilename = result.filename;
+        } else {
+          const result = await generateHotelTicket(booking, user, policy);
+          ticketPath = result.filepath;
+          ticketFilename = result.filename;
+        }
+
+        // 3. Update booking with confirmation number and ticket path
+        await pool.query(
+          `UPDATE bookings SET
+            confirmation_number = $1,
+            ticket_pdf_path = $2,
+            ticket_generated_at = CURRENT_TIMESTAMP
+           WHERE id = $3`,
+          [confirmationNumber, ticketPath, bookingId]
+        );
+
+        // 4. Send approval email with PDF attached
+        await sendApprovalEmail(user, {
+          ...booking,
+          _ticketPath: ticketPath,
+          _ticketFilename: ticketFilename,
+        }, confirmationNumber);
+
+        // 5. Mark email sent
+        await pool.query(
+          'UPDATE bookings SET email_sent_at = CURRENT_TIMESTAMP, status = $1 WHERE id = $2',
+          ['ticketed', bookingId]
+        );
+
+        console.log(`Fulfillment complete for booking ${bookingId}: confirmation=${confirmationNumber}`);
+      } catch (fulfillError) {
+        console.error(`Fulfillment failed for booking ${bookingId}:`, fulfillError);
+        // Fulfillment failure should not break the approval response
+      }
+    }
+
+    // --- Post-rejection email (non-blocking) ---
+    if (status === 'rejected') {
+      try {
+        const bookingResult = await pool.query(
+          `SELECT b.*, u.name, u.email, u.designation, u.department
+           FROM bookings b
+           JOIN users u ON b.user_id = u.id
+           WHERE b.id = $1`,
+          [bookingId]
+        );
+        const booking = bookingResult.rows[0];
+
+        await sendRejectionEmail(
+          { name: booking.name, email: booking.email },
+          booking,
+          comments || 'No reason provided'
+        );
+      } catch (emailError) {
+        console.error(`Rejection email failed for booking ${bookingId}:`, emailError);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Booking ${status} successfully`,
+      booking_id: bookingId,
+      status
+    });
   } catch (error) {
     console.error('Update approval error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -511,6 +608,48 @@ const getAllBookings = async (req, res) => {
   }
 };
 
+// Download e-ticket PDF
+const downloadTicket = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const userId = req.user.id;
+
+    const result = await pool.query(
+      `SELECT b.*, u.name as employee_name
+       FROM bookings b
+       JOIN users u ON b.user_id = u.id
+       WHERE b.id = $1 AND (b.user_id = $2 OR $3 IN ('admin'))`,
+      [bookingId, userId, req.user.role]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const booking = result.rows[0];
+
+    if (!booking.ticket_pdf_path) {
+      return res.status(404).json({ error: 'E-ticket not yet generated. Please wait for approval.' });
+    }
+
+    const fs = require('fs');
+    if (!fs.existsSync(booking.ticket_pdf_path)) {
+      return res.status(404).json({ error: 'E-ticket file not found' });
+    }
+
+    const filename = booking.booking_type === 'flight'
+      ? `e-ticket-${booking.confirmation_number || bookingId}.pdf`
+      : `confirmation-${booking.confirmation_number || bookingId}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.sendFile(booking.ticket_pdf_path);
+  } catch (error) {
+    console.error('Download ticket error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   createBooking,
   getMyBookings,
@@ -518,5 +657,6 @@ module.exports = {
   getPendingApprovals,
   updateApproval,
   cancelBooking,
-  getAllBookings
+  getAllBookings,
+  downloadTicket
 };
