@@ -166,6 +166,13 @@ const createTables = async () => {
       CREATE INDEX IF NOT EXISTS idx_users_department ON users(department);
     `);
 
+    // Clean up any duplicate travel_policies rows on existing databases and ensure unique index
+    await client.query(`
+      DELETE FROM travel_policies a USING travel_policies b
+      WHERE a.id < b.id AND a.designation = b.designation;
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_travel_policies_designation ON travel_policies(designation);
+    `);
+
     await client.query('COMMIT');
     console.log('Database migration completed successfully!');
   } catch (error) {

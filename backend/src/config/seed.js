@@ -21,20 +21,27 @@ const seedData = async () => {
     ];
 
     for (const policy of policies) {
-      await client.query(
-        `INSERT INTO travel_policies (designation, max_flight_class, max_hotel_stars, salary_min_lakhs, salary_max_lakhs, max_hotel_cost_per_night, max_flight_cost, requires_approval)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         ON CONFLICT (designation) DO UPDATE SET
-           max_flight_class = EXCLUDED.max_flight_class,
-           max_hotel_stars = EXCLUDED.max_hotel_stars,
-           salary_min_lakhs = EXCLUDED.salary_min_lakhs,
-           salary_max_lakhs = EXCLUDED.salary_max_lakhs,
-           max_hotel_cost_per_night = EXCLUDED.max_hotel_cost_per_night,
-           max_flight_cost = EXCLUDED.max_flight_cost,
-           requires_approval = EXCLUDED.requires_approval,
-           updated_at = CURRENT_TIMESTAMP`,
-        [policy.designation, policy.max_flight_class, policy.max_hotel_stars, policy.salary_min, policy.salary_max, policy.max_hotel_cost, policy.max_flight_cost, policy.requires_approval]
+      const existing = await client.query(
+        'SELECT id FROM travel_policies WHERE designation = $1',
+        [policy.designation]
       );
+
+      if (existing.rows.length > 0) {
+        await client.query(
+          `UPDATE travel_policies
+           SET max_flight_class = $1, max_hotel_stars = $2, salary_min_lakhs = $3,
+               salary_max_lakhs = $4, max_hotel_cost_per_night = $5, max_flight_cost = $6,
+               requires_approval = $7, updated_at = CURRENT_TIMESTAMP
+           WHERE designation = $8`,
+          [policy.max_flight_class, policy.max_hotel_stars, policy.salary_min, policy.salary_max, policy.max_hotel_cost, policy.max_flight_cost, policy.requires_approval, policy.designation]
+        );
+      } else {
+        await client.query(
+          `INSERT INTO travel_policies (designation, max_flight_class, max_hotel_stars, salary_min_lakhs, salary_max_lakhs, max_hotel_cost_per_night, max_flight_cost, requires_approval)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [policy.designation, policy.max_flight_class, policy.max_hotel_stars, policy.salary_min, policy.salary_max, policy.max_hotel_cost, policy.max_flight_cost, policy.requires_approval]
+        );
+      }
     }
 
     // Seed comprehensive organizational hierarchy
@@ -105,13 +112,26 @@ const seedData = async () => {
 
     // Insert all users
     for (const user of users) {
-      const passwordHash = await bcrypt.hash(password, salt);
-      await client.query(
-        `INSERT INTO users (name, email, password_hash, role, designation, salary_band, department)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT DO NOTHING`,
-        [user.name, user.email, passwordHash, user.role, user.designation, user.salary_band, user.department]
+      const existingUser = await client.query(
+        'SELECT id FROM users WHERE email = $1',
+        [user.email]
       );
+
+      if (existingUser.rows.length === 0) {
+        const passwordHash = await bcrypt.hash(password, salt);
+        await client.query(
+          `INSERT INTO users (name, email, password_hash, role, designation, salary_band, department)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [user.name, user.email, passwordHash, user.role, user.designation, user.salary_band, user.department]
+        );
+      } else {
+        await client.query(
+          `UPDATE users 
+           SET name = $1, role = $2, designation = $3, salary_band = $4, department = $5, updated_at = CURRENT_TIMESTAMP
+           WHERE email = $6`,
+          [user.name, user.role, user.designation, user.salary_band, user.department, user.email]
+        );
+      }
     }
 
     // Set up manager relationships (all users except CEO)
