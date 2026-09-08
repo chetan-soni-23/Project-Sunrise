@@ -32,3 +32,6 @@ coverage/
 
 # Database
 *.sqlite
+
+# Generated assets
+backend/tickets/

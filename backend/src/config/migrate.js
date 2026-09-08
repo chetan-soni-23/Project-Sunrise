@@ -17,43 +17,10 @@ const createTables = async () => {
         designation VARCHAR(50) NOT NULL,
         salary_band VARCHAR(20) NOT NULL,
         department VARCHAR(50),
+        manager_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-    `);
-
-    // Add justification column to bookings table if not exists
-    await client.query(`
-      DO $$ BEGIN
-        ALTER TABLE bookings ADD COLUMN justification TEXT;
-      EXCEPTION WHEN duplicate_column THEN NULL;
-      END $$;
-    `);
-
-    // Add fulfillment columns to bookings table
-    await client.query(`
-      DO $$ BEGIN
-        ALTER TABLE bookings ADD COLUMN confirmation_number VARCHAR(20);
-      EXCEPTION WHEN duplicate_column THEN NULL;
-      END $$;
-    `);
-    await client.query(`
-      DO $$ BEGIN
-        ALTER TABLE bookings ADD COLUMN ticket_pdf_path VARCHAR(255);
-      EXCEPTION WHEN duplicate_column THEN NULL;
-      END $$;
-    `);
-    await client.query(`
-      DO $$ BEGIN
-        ALTER TABLE bookings ADD COLUMN ticket_generated_at TIMESTAMP;
-      EXCEPTION WHEN duplicate_column THEN NULL;
-      END $$;
-    `);
-    await client.query(`
-      DO $$ BEGIN
-        ALTER TABLE bookings ADD COLUMN email_sent_at TIMESTAMP;
-      EXCEPTION WHEN duplicate_column THEN NULL;
-      END $$;
     `);
 
     // Travel policies table
@@ -95,7 +62,12 @@ const createTables = async () => {
         total_cost DECIMAL(10,2),
         policy_compliant BOOLEAN DEFAULT true,
         policy_violations TEXT[],
+        justification TEXT,
         notes TEXT,
+        confirmation_number VARCHAR(20),
+        ticket_pdf_path VARCHAR(255),
+        ticket_generated_at TIMESTAMP,
+        email_sent_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -109,6 +81,7 @@ const createTables = async () => {
         approver_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
         status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
         comments TEXT,
+        delegated_from INTEGER REFERENCES users(id),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE (booking_id, approver_id)
@@ -130,32 +103,6 @@ const createTables = async () => {
       );
     `);
 
-    // Add delegated_from column to approvals table if not exists
-    await client.query(`
-      DO $$ BEGIN
-        ALTER TABLE approvals ADD COLUMN delegated_from INTEGER REFERENCES users(id);
-      EXCEPTION WHEN duplicate_column THEN NULL;
-      END $$;
-    `);
-
-    // Update approvals CHECK constraint to include 'cancelled' status
-    await client.query(`
-      DO $$ BEGIN
-        ALTER TABLE approvals DROP CONSTRAINT IF EXISTS approvals_status_check;
-        ALTER TABLE approvals ADD CONSTRAINT approvals_status_check
-          CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled'));
-      EXCEPTION WHEN others THEN NULL;
-      END $$;
-    `);
-
-    // Add manager_id column to users table if not exists
-    await client.query(`
-      DO $$ BEGIN
-        ALTER TABLE users ADD COLUMN manager_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
-      EXCEPTION WHEN duplicate_column THEN NULL;
-      END $$;
-    `);
-
     // Search history table
     await client.query(`
       CREATE TABLE IF NOT EXISTS search_history (
@@ -166,6 +113,27 @@ const createTables = async () => {
         results_count INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    // Backwards-compatible migrations for existing databases
+    await client.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS manager_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE bookings ADD COLUMN IF NOT EXISTS justification TEXT;
+      ALTER TABLE bookings ADD COLUMN IF NOT EXISTS confirmation_number VARCHAR(20);
+      ALTER TABLE bookings ADD COLUMN IF NOT EXISTS ticket_pdf_path VARCHAR(255);
+      ALTER TABLE bookings ADD COLUMN IF NOT EXISTS ticket_generated_at TIMESTAMP;
+      ALTER TABLE bookings ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMP;
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS delegated_from INTEGER REFERENCES users(id);
+    `);
+
+    // Update approvals CHECK constraint to include 'cancelled' status if existing
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE approvals DROP CONSTRAINT IF EXISTS approvals_status_check;
+        ALTER TABLE approvals ADD CONSTRAINT approvals_status_check
+          CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled'));
+      EXCEPTION WHEN others THEN NULL;
+      END $$;
     `);
 
     // Create indexes for better performance
