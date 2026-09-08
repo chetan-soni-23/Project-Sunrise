@@ -118,12 +118,23 @@ const createTables = async () => {
     // Backwards-compatible migrations for existing databases
     await client.query(`
       ALTER TABLE users ADD COLUMN IF NOT EXISTS manager_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+      ALTER TABLE travel_policies ADD COLUMN IF NOT EXISTS salary_min_lakhs DECIMAL(10,2);
+      ALTER TABLE travel_policies ADD COLUMN IF NOT EXISTS salary_max_lakhs DECIMAL(10,2);
+      ALTER TABLE travel_policies ADD COLUMN IF NOT EXISTS max_hotel_cost_per_night DECIMAL(10,2);
+      ALTER TABLE travel_policies ADD COLUMN IF NOT EXISTS max_flight_cost DECIMAL(10,2);
+      ALTER TABLE travel_policies ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
       ALTER TABLE bookings ADD COLUMN IF NOT EXISTS justification TEXT;
       ALTER TABLE bookings ADD COLUMN IF NOT EXISTS confirmation_number VARCHAR(20);
       ALTER TABLE bookings ADD COLUMN IF NOT EXISTS ticket_pdf_path VARCHAR(255);
       ALTER TABLE bookings ADD COLUMN IF NOT EXISTS ticket_generated_at TIMESTAMP;
       ALTER TABLE bookings ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMP;
+      ALTER TABLE bookings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
       ALTER TABLE approvals ADD COLUMN IF NOT EXISTS delegated_from INTEGER REFERENCES users(id);
+      ALTER TABLE approvals ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
     `);
 
     // Update approvals CHECK constraint to include 'cancelled' status if existing

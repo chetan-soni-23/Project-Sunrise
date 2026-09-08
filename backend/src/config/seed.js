@@ -24,7 +24,15 @@ const seedData = async () => {
       await client.query(
         `INSERT INTO travel_policies (designation, max_flight_class, max_hotel_stars, salary_min_lakhs, salary_max_lakhs, max_hotel_cost_per_night, max_flight_cost, requires_approval)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         ON CONFLICT DO NOTHING`,
+         ON CONFLICT (designation) DO UPDATE SET
+           max_flight_class = EXCLUDED.max_flight_class,
+           max_hotel_stars = EXCLUDED.max_hotel_stars,
+           salary_min_lakhs = EXCLUDED.salary_min_lakhs,
+           salary_max_lakhs = EXCLUDED.salary_max_lakhs,
+           max_hotel_cost_per_night = EXCLUDED.max_hotel_cost_per_night,
+           max_flight_cost = EXCLUDED.max_flight_cost,
+           requires_approval = EXCLUDED.requires_approval,
+           updated_at = CURRENT_TIMESTAMP`,
         [policy.designation, policy.max_flight_class, policy.max_hotel_stars, policy.salary_min, policy.salary_max, policy.max_hotel_cost, policy.max_flight_cost, policy.requires_approval]
       );
     }
