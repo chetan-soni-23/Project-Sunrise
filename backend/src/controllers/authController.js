@@ -12,7 +12,13 @@ const generateToken = (userId) => {
 // Register new user
 const register = async (req, res) => {
   try {
-    const { name, email, password, role, designation, salaryBand, department } = req.body;
+    const { name, email, password, role, designation, department } = req.body;
+    const salaryBand = req.body.salaryBand || req.body.salary_band;
+    const managerId = req.body.managerId || req.body.manager_id || null;
+
+    if (!salaryBand) {
+      return res.status(400).json({ error: 'Salary band is required' });
+    }
 
     // Check if user already exists
     const existingUser = await pool.query(
@@ -30,10 +36,10 @@ const register = async (req, res) => {
 
     // Insert new user
     const result = await pool.query(
-      `INSERT INTO users (name, email, password_hash, role, designation, salary_band, department) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7) 
+      `INSERT INTO users (name, email, password_hash, role, designation, salary_band, department, manager_id) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
        RETURNING id, name, email, role, designation, salary_band, department, manager_id`,
-      [name, email, passwordHash, role, designation, salaryBand, department]
+      [name, email, passwordHash, role, designation, salaryBand, department, managerId]
     );
 
     const user = result.rows[0];
