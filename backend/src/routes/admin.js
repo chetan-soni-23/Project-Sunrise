@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { getUsers, getUser, createUser, updateUser, resetPassword, deleteUser } = require('../controllers/adminController');
 const { authenticateToken, authorize } = require('../middleware/auth');
+const { adminLimiter } = require('../middleware/rateLimit');
 
-// All routes require admin role
-router.use(authenticateToken, authorize('admin'));
+// All routes require admin role and are rate limited
+router.use(authenticateToken, authorize('admin'), adminLimiter);
 
 // User management
 router.get('/users', getUsers);
