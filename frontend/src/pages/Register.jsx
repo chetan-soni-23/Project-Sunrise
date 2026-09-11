@@ -118,9 +118,14 @@ const Register = () => {
                   className="input-field pl-10"
                   placeholder="Create a password"
                   required
-                  minLength={6}
+                  minLength={8}
+                  pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$"
+                  title="Must be 8+ characters with at least one uppercase letter, one lowercase letter, and one number"
                 />
               </div>
+              <p className="mt-1 text-xs text-secondary-400">
+                Must be 8+ characters with uppercase, lowercase, and a number
+              </p>
             </div>
 
             <div>

@@ -20,9 +20,8 @@ const register = async (req, res) => {
     // Admin and approver roles must be assigned through the admin panel.
     const role = 'employee';
 
-    if (!salaryBand) {
-      return res.status(400).json({ error: 'Salary band is required' });
-    }
+    // Default salary band if not provided
+    const effectiveSalaryBand = salaryBand || 'B';
 
     // Check if user already exists
     const existingUser = await pool.query(
@@ -43,7 +42,7 @@ const register = async (req, res) => {
       `INSERT INTO users (name, email, password_hash, role, designation, salary_band, department, manager_id) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
        RETURNING id, name, email, role, designation, salary_band, department, manager_id`,
-      [name, email, passwordHash, 'employee', designation, salaryBand, department, managerId]
+      [name, email, passwordHash, 'employee', designation, effectiveSalaryBand, department || null, managerId || null]
     );
 
     const user = result.rows[0];
