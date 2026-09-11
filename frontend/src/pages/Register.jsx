@@ -10,7 +10,6 @@ const Register = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'employee',
     designation: '',
     salaryBand: 'B',
     department: ''
@@ -138,20 +137,6 @@ const Register = () => {
                   required
                 />
               </div>
-            </div>
-
-            <div>
-              <label className="label">Role</label>
-              <select
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                className="input-field"
-              >
-                <option value="employee">Employee</option>
-                <option value="approver">Travel Approver</option>
-                <option value="admin">Travel Administrator</option>
-              </select>
             </div>
 
             <div>

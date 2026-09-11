@@ -12,9 +12,13 @@ const generateToken = (userId) => {
 // Register new user
 const register = async (req, res) => {
   try {
-    const { name, email, password, role, designation, department } = req.body;
+    const { name, email, password, designation, department } = req.body;
     const salaryBand = req.body.salaryBand || req.body.salary_band;
     const managerId = req.body.managerId || req.body.manager_id || null;
+
+    // Security: All public registrations are employee role only.
+    // Admin and approver roles must be assigned through the admin panel.
+    const role = 'employee';
 
     if (!salaryBand) {
       return res.status(400).json({ error: 'Salary band is required' });
@@ -39,7 +43,7 @@ const register = async (req, res) => {
       `INSERT INTO users (name, email, password_hash, role, designation, salary_band, department, manager_id) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
        RETURNING id, name, email, role, designation, salary_band, department, manager_id`,
-      [name, email, passwordHash, role, designation, salaryBand, department, managerId]
+      [name, email, passwordHash, 'employee', designation, salaryBand, department, managerId]
     );
 
     const user = result.rows[0];
