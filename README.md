@@ -1,109 +1,51 @@
-# Project Sunrise - Corporate Travel Booking Platform
+# Project Sunrise
 
-A full-stack corporate travel booking platform built with React, Node.js, Express, and PostgreSQL.
+A travel booking app for companies. Employees search flights/hotels, submit bookings that go through an approval chain based on their role and company policy, and get PDF tickets generated on approval.
 
-## 🚀 Features
+Built with React, Express, and PostgreSQL.
 
-### Core Features
-- **Flight Search** - Search flights with mock data, filter by city, class, and dates
-- **Hotel Search** - Search hotels with mock data, filter by city, stars, and dates
-- **Booking System** - Create and manage travel bookings
-- **Approval Workflow** - Multi-level approval system for bookings
-- **Corporate Policy Engine** - Validate bookings against company policies
+## What it does
 
-### User Roles
-1. **Employee** - Search and book flights/hotels, view bookings
-2. **Travel Approver** - Approve/reject booking requests
-3. **Travel Administrator** - Full access to dashboard and analytics
+- **Search** — Flight and hotel search (mock data by default, SerpAPI integration available)
+- **Book** — Employees create bookings; the system checks them against designation-based policies (flight class, hotel stars, cost caps)
+- **Approve** — Bookings that violate policy or require approval route through a management hierarchy. Managers can delegate when OOO.
+- **Deliver** — Approved bookings generate a PDF boarding pass/voucher and send it via email
+- **Admin** — Dashboard for spend analytics, policy configuration, and user management
 
-### Dashboard Features
-- Today's bookings count
-- Total travel spend
-- Pending approvals
-- Most travelled cities
-- Booking status breakdown
-- Monthly trend analysis
+## Roles
 
-## 📋 Prerequisites
+| Role | Can do |
+|------|--------|
+| Employee | Search, book, view own bookings |
+| Approver | Approve/reject bookings, manage delegations |
+| Admin | Everything + user management, policies, analytics |
 
-- **Node.js** (v18 or higher)
-- **PostgreSQL** (v12 or higher)
-- **npm** or **yarn**
+## Setup
 
-## 🛠️ Installation
+### Prerequisites
+- Node.js 18+
+- PostgreSQL 12+
 
-### 1. Clone the repository
-```bash
-git clone <repository-url>
-cd project-sunrise
-```
-
-### 2. Setup Backend
-
+### Backend
 ```bash
 cd backend
 npm install
-```
-
-### 3. Configure Environment Variables
-
-Edit `backend/.env` with your PostgreSQL credentials:
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=project_sunrise
-DB_USER=postgres
-DB_PASSWORD=your_password
-JWT_SECRET=your-secret-key
-PORT=5000
-```
-
-### 4. Create Database
-
-```sql
-CREATE DATABASE project_sunrise;
-```
-
-### 5. Run Migrations
-
-```bash
+cp .env.example .env    # edit with your DB credentials
 npm run migrate
-```
-
-### 6. Seed Test Data
-
-```bash
 npm run seed
-```
-
-### 7. Setup Frontend
-
-```bash
-cd ../frontend
-npm install
-```
-
-## 🚀 Running the Application
-
-### Start Backend Server
-```bash
-cd backend
 npm run dev
 ```
 
-### Start Frontend Development Server
+### Frontend
 ```bash
 cd frontend
+npm install
 npm run dev
 ```
 
-The application will be available at:
-- **Frontend:** http://localhost:3000
-- **Backend API:** http://localhost:5000/api
+Frontend runs on `http://localhost:3000`, backend on `http://localhost:5000`.
 
-## 👥 Test Accounts
-
-After running the seed script, you can login with:
+### Test accounts (after seeding)
 
 | Role | Email | Password |
 |------|-------|----------|
@@ -111,86 +53,50 @@ After running the seed script, you can login with:
 | Approver | aditya.roy@company.com | password123 |
 | Admin | arjun.mehta@company.com | password123 |
 
-## 📁 Project Structure
+## Tech stack
+
+- **Frontend:** React 18, Vite, Tailwind CSS, React Router v6, Axios
+- **Backend:** Express.js, PostgreSQL (pg), JWT auth, bcryptjs
+- **Extras:** PDFKit (ticket generation), Nodemailer (email), express-rate-limit, express-validator
+
+## Project structure
 
 ```
 project-sunrise/
 ├── backend/
-│   ├── src/
-│   │   ├── config/          # Database and migration config
-│   │   ├── controllers/     # Route handlers
-│   │   ├── middleware/       # Auth middleware
-│   │   ├── models/          # Database models
-│   │   ├── mockData/        # Flight and hotel mock data
-│   │   ├── routes/          # API routes
-│   │   └── server.js        # Express server
-│   ├── .env                 # Environment variables
-│   └── package.json
-│
+│   └── src/
+│       ├── config/          # DB connection, migrations, seeds
+│       ├── controllers/     # Route handlers
+│       ├── middleware/       # Auth, validation, rate limiting
+│       ├── services/        # PDF generation, email
+│       ├── routes/          # Express routers
+│       └── server.js
 ├── frontend/
-│   ├── src/
-│   │   ├── components/      # Reusable components
-│   │   ├── context/         # React context (Auth)
-│   │   ├── pages/           # Page components
-│   │   ├── services/        # API services
-│   │   ├── App.jsx          # Main app component
-│   │   └── main.jsx         # Entry point
-│   ├── index.html
-│   └── package.json
-│
+│   └── src/
+│       ├── components/      # Navbar, modals, route guards
+│       ├── context/         # Auth state (React Context)
+│       ├── pages/           # Page components
+│       └── services/        # Axios instance
+├── ARCHITECTURE.md          # Detailed architecture docs
 └── README.md
 ```
 
-## 📡 API Endpoints
+## API endpoints
 
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user
-- `GET /api/auth/profile` - Get user profile
-
-### Flights
-- `GET /api/flights/search` - Search flights
-- `GET /api/flights/cities` - Get available cities
-- `GET /api/flights/:id` - Get flight by ID
-
-### Hotels
-- `GET /api/hotels/search` - Search hotels
-- `GET /api/hotels/cities` - Get available cities
-- `GET /api/hotels/:id` - Get hotel by ID
-
-### Bookings
-- `POST /api/bookings` - Create booking
-- `GET /api/bookings/my-bookings` - Get user bookings
-- `GET /api/bookings/approvals/pending` - Get pending approvals
-- `PUT /api/bookings/approvals/:id` - Approve/reject booking
-- `PUT /api/bookings/:id/cancel` - Cancel booking
-- `GET /api/bookings/all` - Get all bookings (admin)
-
-### Policies
-- `GET /api/policies` - Get all policies
-- `GET /api/policies/:designation` - Get policy by designation
-- `POST /api/policies/validate` - Validate booking against policy
-
-### Dashboard
-- `GET /api/dashboard/stats` - Get admin dashboard stats
-- `GET /api/dashboard/my-stats` - Get user stats
-
-## 🏗️ Database Schema
-
-### Users Table
-- id, name, email, password_hash, role, designation, salary_band, department
-
-### Bookings Table
-- id, user_id, booking_type, status, travel_date, from_city, to_city, hotel_name, total_cost, etc.
-
-### Approvals Table
-- id, booking_id, approver_id, status, comments
-
-### Travel Policies Table
-- id, designation, max_flight_class, max_hotel_stars, daily_allowance
-
-## 🎨 Tech Stack
-
-- **Frontend:** React 18, Tailwind CSS, React Router, Axios, Lucide Icons
-- **Backend:** Node.js, Express.js, PostgreSQL, JWT, bcryptjs
-- **Tools:** Vite, PostCSS, Nodemon
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `/api/auth/register` | POST | Public | Sign up |
+| `/api/auth/login` | POST | Public | Log in |
+| `/api/auth/profile` | GET | Yes | Get profile |
+| `/api/flights/search` | GET | Yes | Search flights |
+| `/api/hotels/search` | GET | Yes | Search hotels |
+| `/api/bookings` | POST | Yes | Create booking |
+| `/api/bookings/my-bookings` | GET | Yes | My bookings |
+| `/api/bookings/approvals/pending` | GET | Approver+ | Pending approvals |
+| `/api/bookings/approvals/:id` | PUT | Approver+ | Approve/reject |
+| `/api/bookings/:id/ticket` | GET | Yes | Download PDF |
+| `/api/policies` | GET | Yes | List policies |
+| `/api/policies/validate` | POST | Yes | Check policy |
+| `/api/delegations` | GET/POST | Approver+ | Manage delegates |
+| `/api/dashboard/stats` | GET | Admin | Analytics |
+| `/api/admin/users` | GET/POST | Admin | User management |
